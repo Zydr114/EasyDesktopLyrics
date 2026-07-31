@@ -33,28 +33,30 @@
           <TextBlock Classes="cardTitle" Text="文字" />
           <TextBlock Classes="cardDesc" Text="歌词颜色、字号与字重。" />
         </StackPanel>
-        <Grid ColumnDefinitions="120,*" ColumnSpacing="10" RowDefinitions="Auto,Auto" RowSpacing="8">
+        <Grid ColumnDefinitions="120,*" ColumnSpacing="14" RowDefinitions="Auto,Auto" RowSpacing="8">
           <TextBlock Classes="sectionLabel" Text="颜色" />
-          <local:ColorPicker Grid.Column="1" Width="280" Color="{Binding ColorValue, Mode=TwoWay}" />
+          <local:ColorPicker Grid.Column="1" Color="{Binding ColorValue, Mode=TwoWay}" />
           <TextBlock Classes="sectionLabel" Text="字号 / 字重" Grid.Row="1" />
           <Grid Grid.Column="1" Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="10">
-            <Grid ColumnDefinitions="*,38">
+            <Grid ColumnDefinitions="*,64">
               <Slider Minimum="10" Maximum="120" TickFrequency="1"
                       Value="{Binding FontSize, Mode=TwoWay}" />
-              <TextBlock Grid.Column="1" Text="{Binding FontSize, StringFormat='{}{0:F0}'}"
-                         VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+              <TextBox Grid.Column="1" MinHeight="28" Padding="8,2"
+                       Text="{Binding FontSize, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                       TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
             </Grid>
             <ComboBox Grid.Column="1" ItemsSource="{Binding WeightOptions}"
                       SelectedIndex="{Binding WeightIndex, Mode=TwoWay}" />
           </Grid>
         </Grid>
-        <Grid ColumnDefinitions="120,*" ColumnSpacing="10">
+        <Grid ColumnDefinitions="120,*" ColumnSpacing="14">
           <TextBlock Classes="sectionLabel" Text="翻译字号" />
-          <Grid Grid.Column="1" ColumnDefinitions="*,38">
+          <Grid Grid.Column="1" ColumnDefinitions="*,64" ColumnSpacing="14">
             <Slider Minimum="0" Maximum="80" TickFrequency="1"
                     Value="{Binding TransFontSizeVal, Mode=TwoWay}" />
-            <TextBlock Grid.Column="1" Text="{Binding TransFontSizeVal, StringFormat='{}{0:F0}'}"
-                       VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+            <TextBox Grid.Column="1" MinHeight="28" Padding="8,2"
+                     Text="{Binding TransFontSizeVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                     TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
           </Grid>
         </Grid>
         <TextBlock Text="翻译字号为 0 时自动取正文字号的 60%。" FontSize="11" Opacity="0.6" />
@@ -75,21 +77,23 @@
             <StackPanel Spacing="8">
               <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
                 <TextBlock Classes="sectionLabel" Text="阴影颜色" />
-                <local:ColorPicker Grid.Column="1" Width="260" Color="{Binding ShadowColorValue, Mode=TwoWay}" />
+                <local:ColorPicker Grid.Column="1" Color="{Binding ShadowColorValue, Mode=TwoWay}" />
               </Grid>
-              <Grid ColumnDefinitions="90,*,44" ColumnSpacing="10">
+              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
                 <TextBlock Classes="sectionLabel" Text="模糊半径" />
                 <Slider Grid.Column="1" Minimum="1" Maximum="40" TickFrequency="1"
                         Value="{Binding ShadowBlurVal, Mode=TwoWay}" />
-                <TextBlock Grid.Column="2" Text="{Binding ShadowBlurVal, StringFormat='{}{0:F0}'}"
-                           VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding ShadowBlurVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
               </Grid>
-              <Grid ColumnDefinitions="90,*,44" ColumnSpacing="10">
+              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
                 <TextBlock Classes="sectionLabel" Text="垂直偏移" />
                 <Slider Grid.Column="1" Minimum="-20" Maximum="20" TickFrequency="1"
                         Value="{Binding ShadowOffsetYVal, Mode=TwoWay}" />
-                <TextBlock Grid.Column="2" Text="{Binding ShadowOffsetYVal, StringFormat='{}{0:F0}'}"
-                           VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding ShadowOffsetYVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
               </Grid>
             </StackPanel>
           </Border>
@@ -103,14 +107,15 @@
             <StackPanel Spacing="8">
               <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
                 <TextBlock Classes="sectionLabel" Text="描边颜色" />
-                <local:ColorPicker Grid.Column="1" Width="260" Color="{Binding StrokeColorValue, Mode=TwoWay}" />
+                <local:ColorPicker Grid.Column="1" Color="{Binding StrokeColorValue, Mode=TwoWay}" />
               </Grid>
-              <Grid ColumnDefinitions="90,*,44" ColumnSpacing="10">
+              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
                 <TextBlock Classes="sectionLabel" Text="描边宽度" />
                 <Slider Grid.Column="1" Minimum="1" Maximum="8" TickFrequency="0.5"
                         Value="{Binding StrokeThicknessVal, Mode=TwoWay}" />
-                <TextBlock Grid.Column="2" Text="{Binding StrokeThicknessVal, StringFormat='{}{0:F1}'}"
-                           VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding StrokeThicknessVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
               </Grid>
             </StackPanel>
           </Border>
@@ -124,14 +129,15 @@
             <StackPanel Spacing="8">
               <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
                 <TextBlock Classes="sectionLabel" Text="辉光颜色" />
-                <local:ColorPicker Grid.Column="1" Width="260" Color="{Binding GlowColorValue, Mode=TwoWay}" />
+                <local:ColorPicker Grid.Column="1" Color="{Binding GlowColorValue, Mode=TwoWay}" />
               </Grid>
-              <Grid ColumnDefinitions="90,*,44" ColumnSpacing="10">
+              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
                 <TextBlock Classes="sectionLabel" Text="辉光强度" />
                 <Slider Grid.Column="1" Minimum="4" Maximum="16" TickFrequency="1"
                         Value="{Binding GlowRadiusVal, Mode=TwoWay}" />
-                <TextBlock Grid.Column="2" Text="{Binding GlowRadiusVal, StringFormat='{}{0:F0}'}"
-                           VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding GlowRadiusVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
               </Grid>
             </StackPanel>
           </Border>
@@ -147,7 +153,7 @@
           <TextBlock Classes="cardDesc"
                      Text="点击播放控制条中的上一首/下一首时，封面平滑淡入居中展示，之后移动到常驻位置（若开启常驻）或淡出。封面为正方形，边长不超过歌词行高度的 120%。" />
         </StackPanel>
-        <Grid ColumnDefinitions="110,*,Auto" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
+        <Grid ColumnDefinitions="110,*,64" ColumnSpacing="14" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
           <TextBlock Classes="sectionLabel" Text="常驻显示" />
           <ToggleSwitch Grid.Column="1" IsChecked="{Binding CoverEnabled, Mode=TwoWay}" />
           <TextBlock Classes="sectionLabel" Text="切歌动画" Grid.Row="1" />
@@ -155,18 +161,18 @@
           <TextBlock Classes="sectionLabel" Text="封面占比" Grid.Row="2" />
           <Slider Grid.Column="1" Grid.Row="2" Minimum="40" Maximum="120" TickFrequency="5"
                   Value="{Binding CoverSizePctVal, Mode=TwoWay}" />
-          <TextBlock Grid.Column="2" Grid.Row="2" Text="{Binding CoverSizePctVal, StringFormat='{}{0:F0}%'}"
-                     VerticalAlignment="Center" TextAlignment="Right" FontSize="12" Width="44" />
+          <TextBox Grid.Column="2" Grid.Row="2" MinHeight="28" Padding="8,2" Text="{Binding CoverSizePctVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}%'}"
+                   TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
           <TextBlock Classes="sectionLabel" Text="最短显示" Grid.Row="3" />
           <Slider Grid.Column="1" Grid.Row="3" Minimum="0.3" Maximum="5" TickFrequency="0.1"
                   Value="{Binding CoverAnimMinSec, Mode=TwoWay}" />
-          <TextBlock Grid.Column="2" Grid.Row="3" Text="{Binding CoverAnimMinSec, StringFormat='{}{0:F1}s'}"
-                     VerticalAlignment="Center" TextAlignment="Right" FontSize="12" Width="44" />
+          <TextBox Grid.Column="2" Grid.Row="3" MinHeight="28" Padding="8,2" Text="{Binding CoverAnimMinSec, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}s'}"
+                   TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
           <TextBlock Classes="sectionLabel" Text="最长显示" Grid.Row="4" />
           <Slider Grid.Column="1" Grid.Row="4" Minimum="1" Maximum="15" TickFrequency="0.5"
                   Value="{Binding CoverAnimMaxSec, Mode=TwoWay}" />
-          <TextBlock Grid.Column="2" Grid.Row="4" Text="{Binding CoverAnimMaxSec, StringFormat='{}{0:F1}s'}"
-                     VerticalAlignment="Center" TextAlignment="Right" FontSize="12" Width="44" />
+          <TextBox Grid.Column="2" Grid.Row="4" MinHeight="28" Padding="8,2" Text="{Binding CoverAnimMaxSec, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}s'}"
+                   TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
         </Grid>
       </StackPanel>
     </Border>
@@ -178,18 +184,20 @@
           <TextBlock Classes="cardTitle" Text="显示效果" />
           <TextBlock Classes="cardDesc" Text="歌词整体透明度与单行最大宽度。" />
         </StackPanel>
-        <Grid ColumnDefinitions="110,*,44" ColumnSpacing="10" RowDefinitions="Auto,Auto" RowSpacing="8">
+        <Grid ColumnDefinitions="110,*,64" ColumnSpacing="14" RowDefinitions="Auto,Auto" RowSpacing="8">
           <TextBlock Classes="sectionLabel" Text="不透明度" />
           <Slider Grid.Column="1" Minimum="0.1" Maximum="1.0" TickFrequency="0.05"
                   Value="{Binding TextOpacity, Mode=TwoWay}" />
-          <TextBlock Grid.Column="2" Text="{Binding TextOpacity, StringFormat='{}{0:P0}'}"
-                     VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+          <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                   Text="{Binding TextOpacity, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:P0}'}"
+                   TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
           <TextBlock Classes="sectionLabel" Text="最大宽度" Grid.Row="1" />
-          <Grid Grid.Column="1" Grid.Row="1" ColumnDefinitions="*,38">
+          <Grid Grid.Column="1" Grid.Row="1" ColumnDefinitions="*,64" ColumnSpacing="14">
             <Slider Minimum="200" Maximum="2000" TickFrequency="50"
                     Value="{Binding MaxWidth, Mode=TwoWay}" />
-            <TextBlock Grid.Column="1" Text="{Binding MaxWidth, StringFormat='{}{0:F0}'}"
-                       VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+            <TextBox Grid.Column="1" MinHeight="28" Padding="8,2"
+                     Text="{Binding MaxWidth, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                     TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
           </Grid>
         </Grid>
         <TextBlock Text="超过最大宽度的歌词行会自动等比缩小。最大宽度单位：DIP。" FontSize="11" Opacity="0.6" />
@@ -204,35 +212,43 @@
           <TextBlock Classes="cardDesc"
                      Text="点击九宫格快速定位，或用滑块精细调节。解锁状态下也可直接拖动歌词窗口。" />
         </StackPanel>
-        <StackPanel HorizontalAlignment="Left">
-          <ItemsControl ItemsSource="{Binding PositionPresets}" MaxWidth="124">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate>
-                <WrapPanel />
-              </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate>
-                <Button Content="{Binding Label}" Width="36" Height="30" Margin="2" Padding="0"
-                        Command="{Binding $parent[ItemsControl].DataContext.SnapPresetCommand}"
-                        CommandParameter="{Binding Preset, StringFormat='{}{0}'}" />
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
-        <Grid ColumnDefinitions="50,*,44" ColumnSpacing="10">
-          <TextBlock Classes="sectionLabel" Text="水平" />
-          <Slider Grid.Column="1" Minimum="5" Maximum="95" TickFrequency="1"
-                  Value="{Binding PositionXPct, Mode=TwoWay}" />
-          <TextBlock Grid.Column="2" Text="{Binding PositionXPct, StringFormat='{}{0:F0}%'}"
-                     VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
-        </Grid>
-        <Grid ColumnDefinitions="50,*,44" ColumnSpacing="10">
-          <TextBlock Classes="sectionLabel" Text="垂直" />
-          <Slider Grid.Column="1" Minimum="5" Maximum="95" TickFrequency="1"
-                  Value="{Binding PositionYPct, Mode=TwoWay}" />
-          <TextBlock Grid.Column="2" Text="{Binding PositionYPct, StringFormat='{}{0:F0}%'}"
-                     VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="24">
+          <!-- 九宫格（左） -->
+          <StackPanel HorizontalAlignment="Left">
+            <ItemsControl ItemsSource="{Binding PositionPresets}" MaxWidth="124">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <WrapPanel />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Button Content="{Binding Label}" Width="36" Height="30" Margin="2" Padding="0"
+                          Command="{Binding $parent[ItemsControl].DataContext.SnapPresetCommand}"
+                          CommandParameter="{Binding Preset, StringFormat='{}{0}'}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+          <!-- 精细调节（右） -->
+          <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
+            <Grid ColumnDefinitions="50,*,64" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="水平" />
+              <Slider Grid.Column="1" Minimum="5" Maximum="95" TickFrequency="1"
+                      Value="{Binding PositionXPct, Mode=TwoWay}" />
+              <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                       Text="{Binding PositionXPct, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}%'}"
+                       TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+            </Grid>
+            <Grid ColumnDefinitions="50,*,64" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="垂直" />
+              <Slider Grid.Column="1" Minimum="5" Maximum="95" TickFrequency="1"
+                      Value="{Binding PositionYPct, Mode=TwoWay}" />
+              <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                       Text="{Binding PositionYPct, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}%'}"
+                       TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+            </Grid>
+          </StackPanel>
         </Grid>
       </StackPanel>
     </Border>

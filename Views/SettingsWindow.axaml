@@ -6,17 +6,16 @@
         x:DataType="vm:SettingsViewModel"
         Title="EasyDesktopLyrics 设置"
         Width="780" Height="740" MinWidth="680" MinHeight="560"
-        RequestedThemeVariant="Default"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        TransparencyLevelHint="Mica,Blur"
+        Background="Transparent">
 
   <Window.Styles>
-    <Style Selector="TextBox /template/ Border#PART_BorderElement">
-      <Setter Property="CornerRadius" Value="4" />
-    </Style>
+    <!-- 卡片：半透明深色分层（透过云母），WinUI 3 圆角语言 -->
     <Style Selector="Border.card">
-      <Setter Property="Background" Value="{DynamicResource SystemAltLowColor}" />
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="Padding" Value="14" />
+      <Setter Property="Background" Value="#F01F1F1F" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="16" />
     </Style>
     <Style Selector="TextBlock.cardTitle">
       <Setter Property="FontSize" Value="14" />
@@ -34,7 +33,7 @@
     <Style Selector="Separator">
       <Setter Property="Margin" Value="0,2" />
     </Style>
-    <!-- 侧边导航：自定义 ListBoxItem 模板（无 Fluent 动画），
+    <!-- 侧边导航：NavigationView 风格胶囊高亮（无 Fluent 动画），
          :selected 定义在 :pointerover 之后，同优先级下后者优先，hover 不覆盖选中高亮 -->
     <Style Selector="ListBox.nav">
       <Setter Property="Background" Value="Transparent" />
@@ -49,16 +48,16 @@
                               ContentTemplate="{TemplateBinding ContentTemplate}"
                               Background="{TemplateBinding Background}"
                               CornerRadius="6"
-                              Padding="10,7" />
+                              Padding="10,8" />
           </ControlTemplate>
         </Setter.Value>
       </Setter>
       <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Margin" Value="4,1,0,1" />
+      <Setter Property="Margin" Value="8,1,12,1" />
       <Setter Property="Transitions" Value="{x:Null}" />
     </Style>
     <Style Selector="ListBox.nav ListBoxItem:pointerover">
-      <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundListLowBrush}" />
+      <Setter Property="Background" Value="#12FFFFFF" />
     </Style>
     <Style Selector="ListBox.nav ListBoxItem:selected">
       <Setter Property="Background" Value="{DynamicResource SystemAccentColor}" />
@@ -69,22 +68,22 @@
   </Window.Styles>
 
   <Grid ColumnDefinitions="196,*">
-    <!-- 侧边导航 -->
-    <Border Grid.Column="0" Background="{DynamicResource SystemAltLowColor}"
-            BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+    <!-- 侧边导航（半透明，透出云母） -->
+    <Border Grid.Column="0" Background="#E61F1F1F"
+            BorderBrush="#26FFFFFF"
             BorderThickness="0,0,1,0">
       <DockPanel>
-        <StackPanel DockPanel.Dock="Top" Margin="16,16,16,8">
-          <TextBlock Text="EasyDesktopLyrics" FontSize="17" FontWeight="SemiBold" />
+        <StackPanel DockPanel.Dock="Top" Margin="20,18,16,12">
+          <TextBlock Text="EasyDesktopLyrics" FontSize="16" FontWeight="SemiBold" />
           <TextBlock Text="设置" FontSize="12" Opacity="0.6" />
         </StackPanel>
-        <ListBox Classes="nav" Margin="4,2,0,12"
+        <ListBox Classes="nav" Margin="0,2,0,12"
                  ItemsSource="{Binding NavOptions}"
                  SelectedIndex="{Binding SelectedNav, Mode=TwoWay}">
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="vm:NavOption">
-              <Grid ColumnDefinitions="30,*" ColumnSpacing="10">
-                <TextBlock Text="{Binding Icon}" FontSize="17" VerticalAlignment="Center"
+              <Grid ColumnDefinitions="28,*" ColumnSpacing="10">
+                <TextBlock Text="{Binding Icon}" FontSize="15" VerticalAlignment="Center"
                            FontFamily="Segoe Fluent Icons,Segoe MDL2 Assets" />
                 <TextBlock Grid.Column="1" Text="{Binding Label}" FontSize="13"
                            VerticalAlignment="Center" />
@@ -95,10 +94,13 @@
       </DockPanel>
     </Border>
 
-    <!-- 内容区 -->
-    <ScrollViewer x:Name="ContentScroll" Grid.Column="1" Padding="16,14">
-      <ContentControl x:Name="ContentHost" />
+    <!-- 内容区：Padding 改为内容 Margin（Margin 计入 Extent，滚动范围完整） -->
+    <ScrollViewer x:Name="ContentScroll" Grid.Column="1"
+                  Background="Transparent"
+                  HorizontalScrollBarVisibility="Disabled">
+      <ContentControl x:Name="ContentHost" Margin="16,14,16,4" />
     </ScrollViewer>
   </Grid>
 
 </Window>
+

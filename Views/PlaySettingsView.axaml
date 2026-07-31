@@ -6,14 +6,14 @@
 
   <UserControl.Styles>
     <Style Selector="Border.dragRow">
-      <Setter Property="CornerRadius" Value="6" />
-      <Setter Property="Padding" Value="6,0" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="8,0" />
       <Setter Property="Margin" Value="0,1" />
     </Style>
     <Style Selector="Border.ghostCard">
-      <Setter Property="Background" Value="{DynamicResource SystemChromeLowColor}" />
+      <Setter Property="Background" Value="#F01F1F1F" />
       <Setter Property="Opacity" Value="0.95" />
-      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="CornerRadius" Value="8" />
       <Setter Property="Padding" Value="10,6" />
       <Setter Property="Effect">
         <Setter.Value>
@@ -86,7 +86,7 @@
           <TextBlock Text="本地歌词目录（多个用分号分隔；修改文件后请清空缓存）"
                      FontSize="11" Opacity="0.6" />
           <TextBox Text="{Binding LyricsFolder, Mode=TwoWay}"
-                   Watermark="例如：D:\Lyrics；E:\Music\歌词" />
+                   PlaceholderText="例如：D:\Lyrics；E:\Music\歌词" />
         </StackPanel>
       </Border>
 
@@ -98,13 +98,14 @@
             <TextBlock Classes="cardDesc"
                        Text="正值 = 歌词提前显示，负值 = 歌词延后。用于歌词与声音整体不同步的场景。" />
           </StackPanel>
-          <Grid ColumnDefinitions="110,*" ColumnSpacing="10">
+          <Grid ColumnDefinitions="110,*" ColumnSpacing="14">
             <TextBlock Classes="sectionLabel" Text="全局偏移 (ms)" />
-            <Grid Grid.Column="1" ColumnDefinitions="*,70">
+            <Grid Grid.Column="1" ColumnDefinitions="*,64" ColumnSpacing="14">
               <Slider Minimum="-5000" Maximum="5000" TickFrequency="100"
                       Value="{Binding GlobalOffsetMs, Mode=TwoWay}" />
-              <TextBlock Grid.Column="1" Text="{Binding GlobalOffsetMs, StringFormat='{}{0}'}"
-                         VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+              <TextBox Grid.Column="1" MinHeight="28" Padding="8,2"
+                       Text="{Binding GlobalOffsetMs, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0}'}"
+                       TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
             </Grid>
           </Grid>
         </StackPanel>

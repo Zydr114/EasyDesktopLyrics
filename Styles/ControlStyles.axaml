@@ -1,0 +1,77 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- ============ Button：WinUI 3 深色按钮（半透明灰叠加，hover/pressed 提亮） ============ -->
+  <Style Selector="Button">
+    <Setter Property="Background" Value="#0DFFFFFF" />
+    <Setter Property="BorderBrush" Value="#2BFFFFFF" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Foreground" Value="#F2FFFFFF" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Padding" Value="12,5" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button:pointerover">
+    <Setter Property="Background" Value="#1AFFFFFF" />
+    <Setter Property="BorderBrush" Value="#45FFFFFF" />
+  </Style>
+  <Style Selector="Button:pressed">
+    <Setter Property="Background" Value="#2EFFFFFF" />
+  </Style>
+  <Style Selector="Button:disabled">
+    <Setter Property="Opacity" Value="0.45" />
+  </Style>
+
+  <!-- 主题色按钮（主操作） -->
+  <Style Selector="Button.accent">
+    <Setter Property="Background" Value="{DynamicResource SystemAccentColor}" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
+  <Style Selector="Button.accent:pointerover">
+    <Setter Property="BorderBrush" Value="#80FFFFFF" />
+    <Setter Property="Background" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+  </Style>
+  <Style Selector="Button.accent:pressed">
+    <Setter Property="Opacity" Value="0.85" />
+  </Style>
+
+  <!-- ============ TextBox：圆角 + 统一高度（聚焦 accent 边框由 Fluent 模板提供） ============ -->
+  <Style Selector="TextBox">
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="MinHeight" Value="32" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+
+  <!-- ============ ComboBox：圆角 + 统一高度 ============ -->
+  <Style Selector="ComboBox">
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="MinHeight" Value="32" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+
+  <!-- ============ 滚动条：细圆角 Thumb ============ -->
+  <Style Selector="ScrollBar /template/ Thumb">
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
+
+  <!-- ============ Slider：WinUI 3 外观（白圆 Thumb + 灰轨道；无阴影/缩放动画） ============ -->
+  <Style Selector="Slider">
+    <Setter Property="Height" Value="32" />
+  </Style>
+  <Style Selector="Slider /template/ Thumb /template/ Border">
+    <Setter Property="BorderBrush" Value="#33000000" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <!-- ============ 杂项微调 ============ -->
+  <Style Selector="CheckBox">
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style Selector="ListBoxItem">
+    <Setter Property="CornerRadius" Value="6" />
+  </Style>
+
+</Styles>

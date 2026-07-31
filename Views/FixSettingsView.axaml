@@ -22,7 +22,7 @@
                      Text="自动匹配失败或错误时，搜索并指定歌词。绑定关系会持久保存。" />
         </StackPanel>
         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-          <TextBox Text="{Binding SearchKeyword, Mode=TwoWay}" Watermark="输入歌名 / 歌手…" />
+          <TextBox Text="{Binding SearchKeyword, Mode=TwoWay}" PlaceholderText="输入歌名 / 歌手…" />
           <Button Grid.Column="1" Content="搜索" Command="{Binding SearchCommand}"
                   Padding="16,4" />
         </Grid>

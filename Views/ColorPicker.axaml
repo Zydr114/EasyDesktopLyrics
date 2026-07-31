@@ -4,9 +4,9 @@
 
   <StackPanel Spacing="6">
     <!-- 饱和度/明度面板 -->
-    <Border x:Name="SvPanel" Height="120" CornerRadius="4" ClipToBounds="True"
+    <Border x:Name="SvPanel" Height="120" CornerRadius="6" ClipToBounds="True"
             Background="White" Cursor="Cross">
-      <Border x:Name="SvShade" Background="Transparent" CornerRadius="4">
+      <Border x:Name="SvShade" Background="Transparent" CornerRadius="6">
         <Canvas>
           <Border x:Name="SvIndicator" Width="12" Height="12" CornerRadius="6"
                   BorderBrush="White" BorderThickness="2" Background="Transparent"
@@ -16,7 +16,7 @@
     </Border>
 
     <!-- 色相条 -->
-    <Border x:Name="HueBar" Height="14" CornerRadius="3" Cursor="Cross">
+    <Border x:Name="HueBar" Height="14" CornerRadius="6" Cursor="Cross">
       <Canvas>
         <Border x:Name="HueIndicator" Width="6" Height="18" CornerRadius="2"
                 BorderBrush="White" BorderThickness="1.5" Background="Transparent"
@@ -25,10 +25,10 @@
     </Border>
 
     <!-- 透明度条 -->
-    <Border x:Name="AlphaBar" Height="14" CornerRadius="3" Cursor="Cross">
+    <Border x:Name="AlphaBar" Height="14" CornerRadius="6" Cursor="Cross">
       <Grid>
-        <Border Background="White" CornerRadius="3" />
-        <Border x:Name="AlphaShade" CornerRadius="3" />
+        <Border Background="White" CornerRadius="6" />
+        <Border x:Name="AlphaShade" CornerRadius="6" />
         <Canvas>
           <Border x:Name="AlphaIndicator" Width="6" Height="18" CornerRadius="2"
                   BorderBrush="White" BorderThickness="1.5" Background="Transparent"
@@ -41,7 +41,7 @@
     <Grid ColumnDefinitions="*,44" ColumnSpacing="6">
       <TextBox x:Name="HexBox" VerticalAlignment="Center" />
       <Border x:Name="PreviewBlock" Grid.Column="1" Width="44" Height="24"
-              CornerRadius="3" VerticalAlignment="Center" />
+              CornerRadius="6" VerticalAlignment="Center" />
     </Grid>
   </StackPanel>
 

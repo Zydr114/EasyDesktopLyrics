@@ -1,8 +1,30 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="EasyDesktopLyrics.App"
-             RequestedThemeVariant="Default">
+             RequestedThemeVariant="Dark">
+
+  <Application.Resources>
+    <!-- WinUI 3 风格 Slider 资源覆盖：灰胶囊轨道 + 白色圆 Thumb（Fluent 模板按资源键取值） -->
+    <SolidColorBrush x:Key="SliderTrackFill" Color="#5A5A5A" />
+    <SolidColorBrush x:Key="SliderTrackFillPointerOver" Color="#6E6E6E" />
+    <SolidColorBrush x:Key="SliderTrackFillPressed" Color="#787878" />
+    <SolidColorBrush x:Key="SliderTrackFillDisabled" Color="#3A3A3A" />
+    <SolidColorBrush x:Key="SliderTrackValueFill" Color="#8E8E8E" />
+    <SolidColorBrush x:Key="SliderTrackValueFillPointerOver" Color="#A0A0A0" />
+    <SolidColorBrush x:Key="SliderTrackValueFillPressed" Color="#AAAAAA" />
+    <SolidColorBrush x:Key="SliderTrackValueFillDisabled" Color="#4A4A4A" />
+    <SolidColorBrush x:Key="SliderThumbBackground" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="SliderThumbBackgroundPointerOver" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="SliderThumbBackgroundPressed" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="SliderThumbBackgroundDisabled" Color="#6E6E6E" />
+    <x:Double x:Key="SliderHorizontalThumbWidth">16</x:Double>
+    <x:Double x:Key="SliderHorizontalThumbHeight">16</x:Double>
+    <x:Double x:Key="SliderVerticalThumbWidth">16</x:Double>
+    <x:Double x:Key="SliderVerticalThumbHeight">16</x:Double>
+  </Application.Resources>
+
   <Application.Styles>
     <FluentTheme />
+    <StyleInclude Source="avares://EasyDesktopLyrics/Styles/ControlStyles.axaml" />
   </Application.Styles>
 </Application>
