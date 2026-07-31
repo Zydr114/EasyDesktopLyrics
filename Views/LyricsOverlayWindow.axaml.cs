@@ -68,7 +68,6 @@ public sealed partial class LyricsOverlayWindow : Window
         PointerEntered += (_, _) => { _hideControlsTimer.Stop(); SetControlsVisible(true); };
         PointerExited += (_, _) => _hideControlsTimer.Start();
 
-        RootPanel.SizeChanged += (_, _) => UpdateCoverSize();
         _vm.PropertyChanged += OnVmChanged;
         SizeChanged += OnSizeChanged;
     }
@@ -228,7 +227,10 @@ public sealed partial class LyricsOverlayWindow : Window
             OnCoverChanged();
         else if (e.PropertyName is nameof(OverlayViewModel.CoverEnabled)
                  or nameof(OverlayViewModel.CoverPosition))
+        {
             ApplyCoverLayout();
+            UpdateCoverSize();
+        }
         else if (e.PropertyName == nameof(OverlayViewModel.CoverSizePct))
             UpdateCoverSize();
         else if (e.PropertyName is nameof(OverlayViewModel.StrokeEnabled)
@@ -242,31 +244,58 @@ public sealed partial class LyricsOverlayWindow : Window
 
     // ---------- 封面 ----------
 
+    /// <summary>封面尺寸基准：切歌时快照的歌词宽度（行宽变化不影响封面，避免抖动）。</summary>
+    private double _coverBaseWidth;
+    private double _coverSize;
+
     /// <summary>
-    /// 切歌动画状态机：
+    /// 切歌动画状态机（独立于常驻显示）：
     /// T0 歌词淡出 + 封面居中淡入 → 0.8s 后分支（常驻=移动到常驻位 / 不常驻=封面淡出）→ 歌词淡入。
+    /// 未开启切歌动画时：常驻封面直接淡入常驻位，否则仅更新歌词。
     /// </summary>
     private void OnCoverChanged()
     {
         ApplyCoverLayout();
-        UpdateCoverSize();
 
         if (_vm.CoverImage == null)
         {
             // 无封面：直接显示歌词
+            _coverAnimating = false;
+            Cover.Opacity = 0;
             SetLyricsOpacity(1);
             return;
         }
 
-        _coverAnimating = true;
-        _coverStageTimer.Stop();
-        SetLyricsOpacity(0);
+        // 快照歌词宽度作为封面尺寸基准
+        if (RootPanel.Bounds.Width > 0)
+            _coverBaseWidth = RootPanel.Bounds.Width;
+        UpdateCoverSize();
         CoverImage.Source = _vm.CoverImage;
 
-        // 封面居中淡入
-        Cover.RenderTransform = new TranslateTransform(CenterOffsetX(), CenterOffsetY());
-        Cover.Opacity = 1;
-        _coverStageTimer.Start();
+        if (_vm.CoverCutAnimation)
+        {
+            _coverAnimating = true;
+            _coverStageTimer.Stop();
+            SetLyricsOpacity(0);
+            Cover.RenderTransform = new TranslateTransform(CenterOffsetX(), CenterOffsetY());
+            Cover.Opacity = 1;
+            _coverStageTimer.Start();
+            return;
+        }
+
+        // 无切歌动画：直接定位
+        _coverAnimating = false;
+        SetLyricsOpacity(1);
+        if (_vm.CoverEnabled)
+        {
+            var target = CoverSlotOffset();
+            Cover.RenderTransform = new TranslateTransform(target.X, target.Y);
+            Cover.Opacity = 1;
+        }
+        else
+        {
+            Cover.Opacity = 0;
+        }
     }
 
     private void OnCoverStage()
@@ -304,23 +333,19 @@ public sealed partial class LyricsOverlayWindow : Window
         return new Point(Math.Max(0, p.X), Math.Max(0, p.Y));
     }
 
-    /// <summary>封面尺寸 = 歌词实际宽度 × 占比；更新占位列与封面元素尺寸。</summary>
+    /// <summary>封面尺寸 = 基准歌词宽度 × 占比；仅占比设置变化或初始化时调用。</summary>
     private void UpdateCoverSize()
     {
-        var w = Math.Max(0, RootPanel.Bounds.Width * _vm.CoverSizePct / 100.0);
-        CoverSlot.Width = _vm.CoverEnabled ? w : 0;
-        CoverSlot.Height = _vm.CoverEnabled ? w : 0;
-        CoverImage.Width = w;
-        CoverImage.Height = w;
-
-        if (!_coverAnimating && Cover.Opacity > 0)
-        {
-            var target = CoverSlotOffset();
-            Cover.RenderTransform = new TranslateTransform(target.X, target.Y);
-        }
+        if (_coverBaseWidth <= 0)
+            _coverBaseWidth = RootPanel.Bounds.Width;
+        _coverSize = Math.Max(0, _coverBaseWidth * _vm.CoverSizePct / 100.0);
+        CoverSlot.Width = _vm.CoverEnabled ? _coverSize : 0;
+        CoverSlot.Height = _vm.CoverEnabled ? _coverSize : 0;
+        CoverImage.Width = _coverSize;
+        CoverImage.Height = _coverSize;
     }
 
-    /// <summary>应用封面位置布局：占位列 ↔ 歌词列。</summary>
+    /// <summary>应用封面位置布局：占位列 ↔ 歌词列。动画期间不移动封面。</summary>
     private void ApplyCoverLayout()
     {
         var left = _vm.CoverPosition != "right";

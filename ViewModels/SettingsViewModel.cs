@@ -84,7 +84,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         nameof(TransFontSizeVal), nameof(LineSpacingVal), nameof(TextOpacity), nameof(MaxWidth),
         nameof(ShowTranslation), nameof(HideWhenPaused), nameof(ShowTitleWhenNoLyric), nameof(AutoStartEnabled),
         nameof(LyricsFolder), nameof(GlobalOffsetMs),
-        nameof(CoverEnabled), nameof(CoverPositionIndex), nameof(CoverSizePctVal),
+        nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverPositionIndex), nameof(CoverSizePctVal),
         nameof(SelectedPresetIndex), nameof(PositionXPct), nameof(PositionYPct),        nameof(AlignmentIndex), nameof(SelectedFontFamily),
     ];
 
@@ -704,6 +704,16 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         {
             if (value == _settings.Current.CoverEnabled) return;
             _settings.Update(s => s.CoverEnabled = value);
+        }
+    }
+
+    public bool CoverCutAnimation
+    {
+        get => _settings.Current.CoverCutAnimation;
+        set
+        {
+            if (value == _settings.Current.CoverCutAnimation) return;
+            _settings.Update(s => s.CoverCutAnimation = value);
         }
     }
 

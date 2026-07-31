@@ -46,6 +46,8 @@ public sealed class AppSettings
     // ---- 封面 ----
     /// <summary>播放时常驻显示封面。</summary>
     public bool CoverEnabled { get; set; }
+    /// <summary>切歌时封面居中淡入动画（独立于常驻显示）。</summary>
+    public bool CoverCutAnimation { get; set; } = true;
     /// <summary>封面位置："left" / "right"。</summary>
     public string CoverPosition { get; set; } = "left";
     /// <summary>封面占比：封面尺寸 = 歌词宽度 × 该百分比（40–120）。</summary>

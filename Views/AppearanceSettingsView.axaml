@@ -147,17 +147,19 @@
           <TextBlock Classes="cardDesc"
                      Text="切歌时封面平滑淡入居中展示，之后自动移动到常驻位置（若开启常驻）或淡出。封面尺寸不超过歌词宽度的 120%。" />
         </StackPanel>
-        <Grid ColumnDefinitions="110,*,Auto" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+        <Grid ColumnDefinitions="110,*,Auto" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
           <TextBlock Classes="sectionLabel" Text="常驻显示" />
           <ToggleSwitch Grid.Column="1" IsChecked="{Binding CoverEnabled, Mode=TwoWay}" />
-          <TextBlock Classes="sectionLabel" Text="封面位置" Grid.Row="1" />
-          <ComboBox Grid.Column="1" Grid.Row="1" ItemsSource="{Binding CoverPositionOptions}"
+          <TextBlock Classes="sectionLabel" Text="切歌动画" Grid.Row="1" />
+          <ToggleSwitch Grid.Column="1" Grid.Row="1" IsChecked="{Binding CoverCutAnimation, Mode=TwoWay}" />
+          <TextBlock Classes="sectionLabel" Text="封面位置" Grid.Row="2" />
+          <ComboBox Grid.Column="1" Grid.Row="2" ItemsSource="{Binding CoverPositionOptions}"
                     SelectedIndex="{Binding CoverPositionIndex, Mode=TwoWay}" Width="160"
                     HorizontalAlignment="Left" />
-          <TextBlock Classes="sectionLabel" Text="封面占比" Grid.Row="2" />
-          <Slider Grid.Column="1" Grid.Row="2" Minimum="40" Maximum="120" TickFrequency="5"
+          <TextBlock Classes="sectionLabel" Text="封面占比" Grid.Row="3" />
+          <Slider Grid.Column="1" Grid.Row="3" Minimum="40" Maximum="120" TickFrequency="5"
                   Value="{Binding CoverSizePctVal, Mode=TwoWay}" />
-          <TextBlock Grid.Column="2" Grid.Row="2" Text="{Binding CoverSizePctVal, StringFormat='{}{0:F0}%'}"
+          <TextBlock Grid.Column="2" Grid.Row="3" Text="{Binding CoverSizePctVal, StringFormat='{}{0:F0}%'}"
                      VerticalAlignment="Center" TextAlignment="Right" FontSize="12" Width="44" />
         </Grid>
       </StackPanel>
