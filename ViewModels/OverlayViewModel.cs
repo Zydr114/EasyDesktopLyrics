@@ -19,7 +19,7 @@ public sealed class OverlayViewModel : ObservableObject
         nameof(WindowVisible), nameof(IsPlaying),
         nameof(StrokeEnabled), nameof(StrokeBrush), nameof(StrokeThickness), nameof(LineSpacing),
         nameof(TextAlignment), nameof(GlowEnabled),
-        nameof(CoverImage), nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverPosition), nameof(CoverSizePct),
+        nameof(CoverImage), nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverSizePct),
     ];
 
     private readonly SettingsService _settings;
@@ -66,8 +66,6 @@ public sealed class OverlayViewModel : ObservableObject
     public bool CoverEnabled => S.CoverEnabled;
 
     public bool CoverCutAnimation => S.CoverCutAnimation;
-
-    public string CoverPosition => S.CoverPosition;
 
     /// <summary>封面占比：封面边长 = 歌词行高度 × 该百分比（40–120）。</summary>
     public double CoverSizePct => Math.Clamp(S.CoverSizePct, 40, 120);

@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Transformation;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using EasyDesktopLyrics.Interop;
@@ -33,7 +34,6 @@ public sealed partial class LyricsOverlayWindow : Window
     private bool _dragStarted;
     private bool _coverAnimating;
     private bool _lastCoverEnabled;
-    private string _lastCoverPosition = "";
     private double _lastCoverSizePct;
 
     // 动态文本层
@@ -72,7 +72,6 @@ public sealed partial class LyricsOverlayWindow : Window
         PointerExited += (_, _) => _hideControlsTimer.Start();
 
         _lastCoverEnabled = _vm.CoverEnabled;
-        _lastCoverPosition = _vm.CoverPosition;
         _lastCoverSizePct = _vm.CoverSizePct;
 
         _mainGrid.SizeChanged += (_, _) => UpdateCoverSize();
@@ -250,13 +249,6 @@ public sealed partial class LyricsOverlayWindow : Window
             ApplyCoverLayout();
             UpdateCoverSize();
         }
-        else if (e.PropertyName == nameof(OverlayViewModel.CoverPosition))
-        {
-            if (_vm.CoverPosition == _lastCoverPosition)
-                return;
-            _lastCoverPosition = _vm.CoverPosition;
-            ApplyCoverLayout();
-        }
         else if (e.PropertyName == nameof(OverlayViewModel.CoverSizePct))
         {
             if (Math.Abs(_vm.CoverSizePct - _lastCoverSizePct) < 0.5)
@@ -277,9 +269,20 @@ public sealed partial class LyricsOverlayWindow : Window
 
     private double _coverSize;
 
+    /// <summary>动画期间封面放大倍数（居中时更突出，随后缩小并移动回常驻位）。</summary>
+    private const double CoverAnimScale = 1.5;
+
+    /// <summary>构建 translate 变换（Parse 不接受小数，用 Builder）。</summary>
+    private static TransformOperations Translate(double x, double y)
+    {
+        var b = new TransformOperations.Builder(1);
+        b.AppendTranslate(x, y);
+        return b.Build();
+    }
+
     /// <summary>
     /// 切歌（仅"上一首/下一首"触发）动画状态机：
-    /// T0 歌词淡出 + 封面居中淡入 → 0.8s 后分支（常驻=移动到常驻位 / 不常驻=封面淡出）→ 歌词淡入。
+    /// T0 歌词淡出 + 封面放大居中淡入 → 0.8s 后分支（常驻=缩小并移动到常驻位 / 不常驻=封面淡出）→ 歌词淡入。
     /// 非手动切歌：常驻封面直接淡入常驻位，否则仅更新歌词。
     /// </summary>
     private void OnCoverChanged()
@@ -305,10 +308,15 @@ public sealed partial class LyricsOverlayWindow : Window
             _coverAnimating = true;
             _coverStageTimer.Stop();
             SetLyricsOpacity(0);
-            Cover.RenderTransform = new TranslateTransform(CenterOffsetX(), CenterOffsetY());
+
+            // 封面放大居中淡入
+            var animSize = _coverSize * CoverAnimScale;
+            CoverImage.Width = animSize;
+            CoverImage.Height = animSize;
+            Cover.RenderTransform = Translate(CenterOffsetX(animSize), CenterOffsetY(animSize));
             Cover.Opacity = 1;
             _coverStageTimer.Start();
-            Log.Info($"cover: animation started, center=({CenterOffsetX():F0},{CenterOffsetY():F0})");
+            Log.Info($"cover: animation started, center=({CenterOffsetX(animSize):F0},{CenterOffsetY(animSize):F0}) size={animSize:F0}");
             return;
         }
 
@@ -318,7 +326,7 @@ public sealed partial class LyricsOverlayWindow : Window
         if (_vm.CoverEnabled)
         {
             var target = CoverSlotOffset();
-            Cover.RenderTransform = new TranslateTransform(target.X, target.Y);
+            Cover.RenderTransform = Translate(target.X, target.Y);
             Cover.Opacity = 1;
         }
         else
@@ -335,15 +343,19 @@ public sealed partial class LyricsOverlayWindow : Window
 
         if (_vm.CoverEnabled)
         {
-            // 分支 A：封面平滑移动到常驻位置
+            // 分支 A：封面缩小并平滑移动到常驻位置
             var target = CoverSlotOffset();
-            Cover.RenderTransform = new TranslateTransform(target.X, target.Y);
+            Cover.RenderTransform = Translate(target.X, target.Y);
+            CoverImage.Width = _coverSize;
+            CoverImage.Height = _coverSize;
             SetLyricsOpacity(1);
             _coverAnimating = false;
         }
         else
         {
             // 分支 B：封面淡出，恢复歌词
+            CoverImage.Width = _coverSize;
+            CoverImage.Height = _coverSize;
             Cover.Opacity = 0;
             SetLyricsOpacity(1);
             _coverAnimating = false;
@@ -352,15 +364,15 @@ public sealed partial class LyricsOverlayWindow : Window
 
     private void SetLyricsOpacity(double opacity) => LyricsViewbox.Opacity = opacity;
 
-    /// <summary>动画居中 X：窗口内容区水平中心（不受行宽/翻译行影响）。</summary>
-    private double CenterOffsetX() => Math.Max(0, (OuterGrid.Bounds.Width - CoverSlot.Width) / 2);
+    /// <summary>动画居中 X：窗口内容区水平中心。</summary>
+    private double CenterOffsetX(double size) => Math.Max(0, (OuterGrid.Bounds.Width - size) / 2);
 
     /// <summary>动画居中 Y：统一以原文行（主歌词行）为基准，不随翻译行显示与否变化。</summary>
-    private double CenterOffsetY()
+    private double CenterOffsetY(double size)
     {
         var mainTop = _mainGrid.TranslatePoint(new Point(0, 0), OuterGrid)?.Y ?? 0;
         var mainH = _mainGrid.Bounds.Height;
-        return Math.Max(0, mainTop + (mainH - CoverSlot.Height) / 2);
+        return Math.Max(0, mainTop + (mainH - size) / 2);
     }
 
     /// <summary>常驻位置（CoverSlot 左上角）在外层 Grid 内的坐标（与封面元素同一坐标系）。</summary>
@@ -378,7 +390,7 @@ public sealed partial class LyricsOverlayWindow : Window
         if (_vm.CoverEnabled && Cover.Opacity > 0)
         {
             var target = CoverSlotOffset();
-            Cover.RenderTransform = new TranslateTransform(target.X, target.Y);
+            Cover.RenderTransform = Translate(target.X, target.Y);
         }
     }
 
@@ -400,12 +412,11 @@ public sealed partial class LyricsOverlayWindow : Window
         CoverImage.Height = _coverSize;
     }
 
-    /// <summary>应用封面位置布局：占位列 ↔ 歌词列。动画期间不移动封面。</summary>
+    /// <summary>封面位置固定左侧（占位列 0 ↔ 歌词列 1）。</summary>
     private void ApplyCoverLayout()
     {
-        var left = _vm.CoverPosition != "right";
-        Grid.SetColumn(CoverSlot, left ? 0 : 1);
-        Grid.SetColumn(LyricsArea, left ? 1 : 0);
+        Grid.SetColumn(CoverSlot, 0);
+        Grid.SetColumn(LyricsArea, 1);
         UpdateCoverPosition();
     }
 

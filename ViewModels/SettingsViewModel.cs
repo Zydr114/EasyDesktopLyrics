@@ -84,7 +84,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         nameof(TransFontSizeVal), nameof(LineSpacingVal), nameof(TextOpacity), nameof(MaxWidth),
         nameof(ShowTranslation), nameof(HideWhenPaused), nameof(ShowTitleWhenNoLyric), nameof(AutoStartEnabled),
         nameof(LyricsFolder), nameof(GlobalOffsetMs),
-        nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverPositionIndex), nameof(CoverSizePctVal),
+        nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverSizePctVal),
         nameof(SelectedPresetIndex), nameof(PositionXPct), nameof(PositionYPct),        nameof(AlignmentIndex), nameof(SelectedFontFamily),
     ];
 
@@ -693,10 +693,6 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     }
 
     // ---------- 封面 ----------
-    public IReadOnlyList<string> CoverPositionOptions { get; } = ["歌词左侧", "歌词右侧"];
-
-    private static readonly string[] CoverPositionValues = ["left", "right"];
-
     public bool CoverEnabled
     {
         get => _settings.Current.CoverEnabled;
@@ -714,16 +710,6 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         {
             if (value == _settings.Current.CoverCutAnimation) return;
             _settings.Update(s => s.CoverCutAnimation = value);
-        }
-    }
-
-    public int CoverPositionIndex
-    {
-        get => Math.Clamp(Array.IndexOf(CoverPositionValues, _settings.Current.CoverPosition), 0, 1);
-        set
-        {
-            if (value < 0 || value > 1 || CoverPositionValues[value] == _settings.Current.CoverPosition) return;
-            _settings.Update(s => s.CoverPosition = CoverPositionValues[value]);
         }
     }
 

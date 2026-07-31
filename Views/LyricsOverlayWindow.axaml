@@ -43,7 +43,14 @@
             <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.4" />
           </Transitions>
         </Border.Transitions>
-        <Image x:Name="CoverImage" Stretch="UniformToFill" />
+        <Image x:Name="CoverImage" Stretch="UniformToFill">
+          <Image.Transitions>
+            <Transitions>
+              <DoubleTransition Property="Width" Duration="0:0:0.4" />
+              <DoubleTransition Property="Height" Duration="0:0:0.4" />
+            </Transitions>
+          </Image.Transitions>
+        </Image>
       </Border>
 
       <!-- 播放控制条：hover 显示，位于歌词下方（高度动画展开） -->
