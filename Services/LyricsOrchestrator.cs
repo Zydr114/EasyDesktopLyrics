@@ -82,8 +82,8 @@ public sealed partial class LyricsOrchestrator
     /// <summary>任何展示相关状态变化（相位/当前行/播放状态）。UI 线程回调。</summary>
     public event Action? StateChanged;
 
-    /// <summary>手动校正后强制重新解析当前曲目。</summary>
-    public void RefreshCurrent(bool force = true)
+    /// <summary>手动校正后强制重新解析当前曲目（绕过磁盘缓存）。</summary>
+    public void RefreshCurrent()
     {
         var t = Track;
         if (t == null)
@@ -98,7 +98,7 @@ public sealed partial class LyricsOrchestrator
         CurrentTrans = "";
         UpdateTimer();
         Raise();
-        _ = ResolveAndApplyAsync(t, force, cts.Token);
+        _ = ResolveAndApplyAsync(t, force: true, cts.Token);
     }
 
     /// <summary>单曲偏移变更后即时生效（不重新拉取歌词）。</summary>

@@ -15,9 +15,6 @@ public sealed class PlaybackClock
 
     public bool IsPlaying { get; private set; }
 
-    /// <summary>是否存在可用时间线（无时间线 → 降级为仅显示标题）。</summary>
-    public bool HasTimeline => _duration > TimeSpan.Zero;
-
     public void Sync(PlaybackSnapshot s)
     {
         _duration = s.Duration;
