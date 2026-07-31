@@ -19,7 +19,7 @@ public sealed class OverlayViewModel : ObservableObject
         nameof(WindowVisible), nameof(IsPlaying),
         nameof(StrokeEnabled), nameof(StrokeBrush), nameof(StrokeThickness), nameof(LineSpacing),
         nameof(TextAlignment), nameof(GlowEnabled),
-        nameof(CoverImage), nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverPosition), nameof(CoverSizePct),
+        nameof(CoverImage), nameof(CoverTrackKey), nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverPosition), nameof(CoverSizePct),
     ];
 
     private readonly SettingsService _settings;
@@ -44,12 +44,13 @@ public sealed class OverlayViewModel : ObservableObject
         _orchestrator.StateChanged += () =>
         {
             RefreshCover();
+            RefreshCoverTrackKey();
             RaiseMany(AllProps);
         };
 
         PlayPauseCommand = new RelayCommand(() => _ = _smtc.TryTogglePlayPauseAsync());
-        PrevCommand = new RelayCommand(() => _ = _smtc.TrySkipPreviousAsync());
-        NextCommand = new RelayCommand(() => _ = _smtc.TrySkipNextAsync());
+        PrevCommand = new RelayCommand(() => { _cutAnimationFlag = true; _ = _smtc.TrySkipPreviousAsync(); });
+        NextCommand = new RelayCommand(() => { _cutAnimationFlag = true; _ = _smtc.TrySkipNextAsync(); });
     }
 
     public RelayCommand PlayPauseCommand { get; }
@@ -68,12 +69,25 @@ public sealed class OverlayViewModel : ObservableObject
 
     public string CoverPosition => S.CoverPosition;
 
-    /// <summary>封面占比：封面尺寸 = 歌词宽度 × 该百分比（40–120）。</summary>
+    /// <summary>封面占比：封面边长 = 歌词行高度 × 该百分比（40–120）。</summary>
     public double CoverSizePct => Math.Clamp(S.CoverSizePct, 40, 120);
 
     public IImage? CoverImage { get; private set; }
 
+    /// <summary>当前曲目标识（Title|Artist）；仅真正切歌时变化。</summary>
+    public string CoverTrackKey { get; private set; } = "";
+
     private string _coverKey = "";
+    private string _trackKeyCache = "";
+    private bool _cutAnimationFlag;
+
+    /// <summary>消费"上一首/下一首"触发的切歌动画标记。</summary>
+    public bool ConsumeCutAnimationFlag()
+    {
+        var v = _cutAnimationFlag;
+        _cutAnimationFlag = false;
+        return v;
+    }
 
     /// <summary>曲目变化时解码封面（限制解码尺寸，UI 线程执行）。</summary>
     private void RefreshCover()
@@ -99,6 +113,18 @@ public sealed class OverlayViewModel : ObservableObject
             }
         }
         CoverImage = image;
+    }
+
+    /// <summary>真正的切歌（Title|Artist 变化）才更新 CoverTrackKey。</summary>
+    private void RefreshCoverTrackKey()
+    {
+        var t = _orchestrator.Track;
+        var key = t == null ? "" : $"{t.Title}|{t.Artist}";
+        if (key == _trackKeyCache)
+            return;
+        _trackKeyCache = key;
+        CoverTrackKey = key;
+        Raise(nameof(CoverTrackKey));
     }
 
     private AppSettings S => _settings.Current;

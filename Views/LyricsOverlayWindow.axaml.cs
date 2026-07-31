@@ -68,6 +68,7 @@ public sealed partial class LyricsOverlayWindow : Window
         PointerEntered += (_, _) => { _hideControlsTimer.Stop(); SetControlsVisible(true); };
         PointerExited += (_, _) => _hideControlsTimer.Start();
 
+        _mainGrid.SizeChanged += (_, _) => UpdateCoverSize();
         _vm.PropertyChanged += OnVmChanged;
         SizeChanged += OnSizeChanged;
     }
@@ -223,8 +224,14 @@ public sealed partial class LyricsOverlayWindow : Window
             UpdateVisibility();
         else if (e.PropertyName == nameof(OverlayViewModel.IsPlaying))
             UpdatePlayPauseIcon();
-        else if (e.PropertyName == nameof(OverlayViewModel.CoverImage))
+        else if (e.PropertyName == nameof(OverlayViewModel.CoverTrackKey))
             OnCoverChanged();
+        else if (e.PropertyName == nameof(OverlayViewModel.CoverImage))
+        {
+            // 封面内容刷新（同歌重取等），不重放切歌动画
+            if (_vm.CoverImage != null)
+                CoverImage.Source = _vm.CoverImage;
+        }
         else if (e.PropertyName is nameof(OverlayViewModel.CoverEnabled)
                  or nameof(OverlayViewModel.CoverPosition))
         {
@@ -244,18 +251,18 @@ public sealed partial class LyricsOverlayWindow : Window
 
     // ---------- 封面 ----------
 
-    /// <summary>封面尺寸基准：切歌时快照的歌词宽度（行宽变化不影响封面，避免抖动）。</summary>
-    private double _coverBaseWidth;
     private double _coverSize;
 
     /// <summary>
-    /// 切歌动画状态机（独立于常驻显示）：
+    /// 切歌（仅"上一首/下一首"触发）动画状态机：
     /// T0 歌词淡出 + 封面居中淡入 → 0.8s 后分支（常驻=移动到常驻位 / 不常驻=封面淡出）→ 歌词淡入。
-    /// 未开启切歌动画时：常驻封面直接淡入常驻位，否则仅更新歌词。
+    /// 非手动切歌：常驻封面直接淡入常驻位，否则仅更新歌词。
     /// </summary>
     private void OnCoverChanged()
     {
         ApplyCoverLayout();
+        UpdateCoverSize();
+        var animate = _vm.CoverCutAnimation && _vm.ConsumeCutAnimationFlag();
 
         if (_vm.CoverImage == null)
         {
@@ -266,13 +273,9 @@ public sealed partial class LyricsOverlayWindow : Window
             return;
         }
 
-        // 快照歌词宽度作为封面尺寸基准
-        if (RootPanel.Bounds.Width > 0)
-            _coverBaseWidth = RootPanel.Bounds.Width;
-        UpdateCoverSize();
         CoverImage.Source = _vm.CoverImage;
 
-        if (_vm.CoverCutAnimation)
+        if (animate)
         {
             _coverAnimating = true;
             _coverStageTimer.Stop();
@@ -283,7 +286,7 @@ public sealed partial class LyricsOverlayWindow : Window
             return;
         }
 
-        // 无切歌动画：直接定位
+        // 非手动切歌：直接定位
         _coverAnimating = false;
         SetLyricsOpacity(1);
         if (_vm.CoverEnabled)
@@ -333,12 +336,16 @@ public sealed partial class LyricsOverlayWindow : Window
         return new Point(Math.Max(0, p.X), Math.Max(0, p.Y));
     }
 
-    /// <summary>封面尺寸 = 基准歌词宽度 × 占比；仅占比设置变化或初始化时调用。</summary>
+    /// <summary>
+    /// 封面尺寸 = 主歌词行实际高度 × 占比（正方形）。
+    /// 基准行高只受字号等设置控制（行文本长度变化不影响行高），设置变化时由 SizeChanged 驱动。
+    /// </summary>
     private void UpdateCoverSize()
     {
-        if (_coverBaseWidth <= 0)
-            _coverBaseWidth = RootPanel.Bounds.Width;
-        _coverSize = Math.Max(0, _coverBaseWidth * _vm.CoverSizePct / 100.0);
+        var baseH = _mainGrid.Bounds.Height;
+        if (baseH <= 0)
+            baseH = 40;
+        _coverSize = Math.Max(0, baseH * _vm.CoverSizePct / 100.0);
         CoverSlot.Width = _vm.CoverEnabled ? _coverSize : 0;
         CoverSlot.Height = _vm.CoverEnabled ? _coverSize : 0;
         CoverImage.Width = _coverSize;

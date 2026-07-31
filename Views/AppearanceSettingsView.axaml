@@ -145,7 +145,7 @@
         <StackPanel Spacing="2">
           <TextBlock Classes="cardTitle" Text="歌词封面" />
           <TextBlock Classes="cardDesc"
-                     Text="切歌时封面平滑淡入居中展示，之后自动移动到常驻位置（若开启常驻）或淡出。封面尺寸不超过歌词宽度的 120%。" />
+                     Text="点击播放控制条中的上一首/下一首时，封面平滑淡入居中展示，之后移动到常驻位置（若开启常驻）或淡出。封面为正方形，边长不超过歌词行高度的 120%。" />
         </StackPanel>
         <Grid ColumnDefinitions="110,*,Auto" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
           <TextBlock Classes="sectionLabel" Text="常驻显示" />
