@@ -37,6 +37,9 @@ public sealed partial class LyricsOverlayWindow : Window
     private double _coverAnimSize;
     private double _animWindowWidth;
     private DateTimeOffset _coverAnimStart;
+    private bool _coverPendingLayout;
+    private bool _pendingAnimStart;
+    private bool _pendingPersistent;
     private bool _lastCoverEnabled;
     private double _lastCoverSizePct;
 
@@ -349,7 +352,10 @@ public sealed partial class LyricsOverlayWindow : Window
             CoverImage.Height = _coverAnimSize;
             Cover.Opacity = 0;
 
-            _ = ShowCoverAfterLayoutAsync();
+            // 布局完成后（SizeChanged 信号）再滑入封面，确保居中位置准确
+            _pendingAnimStart = true;
+            _pendingPersistent = false;
+            _coverPendingLayout = true;
             Log.Info($"cover: animation started, size={_coverAnimSize:F0}");
             return;
         }
@@ -369,20 +375,39 @@ public sealed partial class LyricsOverlayWindow : Window
         }
     }
 
-    /// <summary>布局稳定后封面从顶边滑入（水平居中于窗口 = 歌词行中心）。</summary>
-    private async Task ShowCoverAfterLayoutAsync()
+    /// <summary>
+    /// 窗口布局稳定后（SizeChanged 信号 + 两帧确认）执行封面滑入或常驻淡入。
+    /// 布局在 Render 阶段执行，SizeChanged 在布局完成后触发，位置计算必然准确。
+    /// </summary>
+    private async Task AfterCoverLayoutAsync()
     {
-        // 布局在 Render 阶段执行，Normal 回调时尚未完成：连续两次确保布局已跑
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Normal);
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Normal);
-        if (!_coverAnimating)
-            return;
 
-        var cx = Math.Max(0, (OuterGrid.Bounds.Width - _coverAnimSize) / 2);
-        Cover.RenderTransform = Translate(cx, -_coverAnimSize); // 顶边外
-        Cover.Opacity = 1;
-        Cover.RenderTransform = Translate(cx, 0);               // 顶边滑入（缓出）
-        _coverTimeoutTimer.Start();
+        if (_pendingAnimStart)
+        {
+            _pendingAnimStart = false;
+            if (!_coverAnimating)
+                return;
+            // 封面从顶边滑入（水平居中于窗口 = 歌词行中心）
+            var cx = Math.Max(0, (OuterGrid.Bounds.Width - _coverAnimSize) / 2);
+            Cover.RenderTransform = Translate(cx, -_coverAnimSize);
+            Cover.Opacity = 1;
+            Cover.RenderTransform = Translate(cx, 0);
+            _coverTimeoutTimer.Start();
+        }
+        else if (_pendingPersistent)
+        {
+            _pendingPersistent = false;
+            await Task.Delay(350); // 等封面淡出完成
+            if (!_vm.CoverEnabled)
+                return;
+            CoverImage.Width = _coverSize;
+            CoverImage.Height = _coverSize;
+            var target = CoverSlotOffset();
+            Cover.RenderTransform = Translate(target.X, target.Y);
+            Cover.Opacity = 1;
+        }
     }
 
     /// <summary>歌词加载完成（Ready/NoLyric）→ 动画进入结束阶段；未达到最短时长则等待补齐。</summary>
@@ -419,7 +444,8 @@ public sealed partial class LyricsOverlayWindow : Window
             Cover.Opacity = 0;
             SetLyricsOpacity(1);
             _coverAnimating = false;
-            _ = ShowPersistentCoverAsync();
+            _pendingPersistent = true;
+            _coverPendingLayout = true;
         }
         else
         {
@@ -549,6 +575,13 @@ public sealed partial class LyricsOverlayWindow : Window
     {
         if (!_suppressPositionUpdate && ClientSize.Width > 0 && ClientSize.Height > 0)
             RepositionToAnchor();
+
+        // 布局完成信号：驱动封面滑入/常驻淡入（布局变化必然触发 SizeChanged）
+        if (_coverPendingLayout)
+        {
+            _coverPendingLayout = false;
+            _ = AfterCoverLayoutAsync();
+        }
     }
 
     /// <summary>按下即拖动（控制条区域除外，避免与按钮点击冲突）。</summary>
