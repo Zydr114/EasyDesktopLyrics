@@ -372,7 +372,7 @@ public sealed partial class LyricsOverlayWindow : Window
             _coverPendingLayout = true;
             _layoutPasses = 0;
             _layoutWaitTimer.Start();
-            Log.Info($"cover: animation started, size={_coverAnimSize:F0}");
+            Log.Info($"cover: animation started, winW={_animWindowWidth:F0} size={_coverAnimSize:F0}");
             return;
         }
 
@@ -392,17 +392,19 @@ public sealed partial class LyricsOverlayWindow : Window
     }
 
     /// <summary>
-    /// 布局稳定后封面从顶边滑入。水平居中用锁定的窗口宽度（已知值，不依赖布局测量）。
+    /// 布局稳定后封面直接显示在居中位置（淡入；滑入特效暂缓）。
+    /// 封面定位坐标系为 OuterGrid（Border padding 内），必须用其宽度计算居中，
+    /// 否则封面中心相对歌词行中心偏移一个左 padding（日志实证：client 764 vs bounds 740）。
     /// </summary>
     private async Task StartCoverSlideInAsync()
     {
         if (!_coverAnimating)
             return;
 
-        var cx = Math.Max(0, (_animWindowWidth - _coverAnimSize) / 2);
-        Cover.RenderTransform = Translate(cx, -_coverAnimSize); // 顶边外
+        var cx = Math.Max(0, (OuterGrid.Bounds.Width - _coverAnimSize) / 2);
+        Log.Info($"cover: show at cx={cx:F0} size={_coverAnimSize:F0} bounds={OuterGrid.Bounds.Width:F0}x{OuterGrid.Bounds.Height:F0}");
+        Cover.RenderTransform = Translate(cx, 0);
         Cover.Opacity = 1;
-        Cover.RenderTransform = Translate(cx, 0);               // 顶边滑入（缓出）
         _coverTimeoutTimer.Start();
     }
 
