@@ -309,14 +309,20 @@ public sealed partial class LyricsOverlayWindow : Window
             _coverStageTimer.Stop();
             SetLyricsOpacity(0);
 
-            // 封面放大居中淡入
-            var animSize = _coverSize * CoverAnimScale;
+            // 大封面在歌词左侧外挂：左右对称占位扩展窗口，歌词保持居中
+            var animSize = AnimCoverSize();
+            CoverSlot.Width = animSize;
+            CoverSlot.Height = animSize;
+            RightPad.Width = animSize;
+            RightPad.Height = animSize;
             CoverImage.Width = animSize;
             CoverImage.Height = animSize;
-            Cover.RenderTransform = Translate(CenterOffsetX(animSize), CenterOffsetY(animSize));
+
+            var mainTop = _mainGrid.TranslatePoint(new Point(0, 0), OuterGrid)?.Y ?? 0;
+            Cover.RenderTransform = Translate(0, mainTop);
             Cover.Opacity = 1;
             _coverStageTimer.Start();
-            Log.Info($"cover: animation started, center=({CenterOffsetX(animSize):F0},{CenterOffsetY(animSize):F0}) size={animSize:F0}");
+            Log.Info($"cover: animation started, size={animSize:F0}");
             return;
         }
 
@@ -343,17 +349,25 @@ public sealed partial class LyricsOverlayWindow : Window
 
         if (_vm.CoverEnabled)
         {
-            // 分支 A：封面缩小并平滑移动到常驻位置
-            var target = CoverSlotOffset();
-            Cover.RenderTransform = Translate(target.X, target.Y);
+            // 分支 A：占位缩回常驻尺寸，封面缩小并移动到常驻位置
+            CoverSlot.Width = _coverSize;
+            CoverSlot.Height = _coverSize;
+            RightPad.Width = _coverSize;
+            RightPad.Height = _coverSize;
             CoverImage.Width = _coverSize;
             CoverImage.Height = _coverSize;
+            var target = CoverSlotOffset();
+            Cover.RenderTransform = Translate(target.X, target.Y);
             SetLyricsOpacity(1);
             _coverAnimating = false;
         }
         else
         {
-            // 分支 B：封面淡出，恢复歌词
+            // 分支 B：占位收起，封面淡出，恢复歌词
+            CoverSlot.Width = 0;
+            CoverSlot.Height = 0;
+            RightPad.Width = 0;
+            RightPad.Height = 0;
             CoverImage.Width = _coverSize;
             CoverImage.Height = _coverSize;
             Cover.Opacity = 0;
@@ -364,15 +378,12 @@ public sealed partial class LyricsOverlayWindow : Window
 
     private void SetLyricsOpacity(double opacity) => LyricsViewbox.Opacity = opacity;
 
-    /// <summary>动画居中 X：窗口内容区水平中心。</summary>
-    private double CenterOffsetX(double size) => Math.Max(0, (OuterGrid.Bounds.Width - size) / 2);
-
-    /// <summary>动画居中 Y：统一以原文行（主歌词行）为基准，不随翻译行显示与否变化。</summary>
-    private double CenterOffsetY(double size)
+    /// <summary>动画封面尺寸：单行歌词宽度 × 300%，上限为主屏工作区高度（防超屏）。</summary>
+    private double AnimCoverSize()
     {
-        var mainTop = _mainGrid.TranslatePoint(new Point(0, 0), OuterGrid)?.Y ?? 0;
-        var mainH = _mainGrid.Bounds.Height;
-        return Math.Max(0, mainTop + (mainH - size) / 2);
+        var w = Math.Max(0, RootPanel.Bounds.Width * CoverAnimScale);
+        var screenH = Screens.Primary?.WorkingArea.Height / (Screens.Primary?.Scaling ?? 1.0) ?? 0;
+        return screenH > 0 ? Math.Min(w, screenH * 0.9) : w;
     }
 
     /// <summary>常驻位置（CoverSlot 左上角）在外层 Grid 内的坐标（与封面元素同一坐标系）。</summary>
@@ -406,17 +417,21 @@ public sealed partial class LyricsOverlayWindow : Window
         if (baseH <= 0)
             baseH = 40;
         _coverSize = Math.Max(0, baseH * _vm.CoverSizePct / 100.0);
-        CoverSlot.Width = _vm.CoverEnabled ? _coverSize : 0;
-        CoverSlot.Height = _vm.CoverEnabled ? _coverSize : 0;
+        var w = _vm.CoverEnabled ? _coverSize : 0;
+        CoverSlot.Width = w;
+        CoverSlot.Height = w;
+        RightPad.Width = w;
+        RightPad.Height = w;
         CoverImage.Width = _coverSize;
         CoverImage.Height = _coverSize;
     }
 
-    /// <summary>封面位置固定左侧（占位列 0 ↔ 歌词列 1）。</summary>
+    /// <summary>封面位置固定左侧（占位列 0，歌词列 1，对称占位列 2 → 歌词保持居中）。</summary>
     private void ApplyCoverLayout()
     {
         Grid.SetColumn(CoverSlot, 0);
         Grid.SetColumn(LyricsArea, 1);
+        Grid.SetColumn(RightPad, 2);
         UpdateCoverPosition();
     }
 
