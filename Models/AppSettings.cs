@@ -42,8 +42,6 @@ public sealed class AppSettings
     public bool AutoStart { get; set; }
     /// <summary>托盘“显示歌词”开关。</summary>
     public bool LyricsVisible { get; set; } = true;
-    /// <summary>锁定 = 鼠标穿透；解锁 = 可拖动调整位置。</summary>
-    public bool PositionLocked { get; set; } = true;
 
     // ---- SMTC ----
     /// <summary>锁定监听的播放器 AUMID；null/空 = 自动跟随系统当前会话。</summary>

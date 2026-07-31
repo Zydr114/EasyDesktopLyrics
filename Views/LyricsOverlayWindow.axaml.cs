@@ -23,11 +23,13 @@ public sealed partial class LyricsOverlayWindow : Window
     private readonly OverlayViewModel _vm;
     private readonly SettingsService _settingsService;
     private readonly DispatcherTimer _topmostTimer;
+    private readonly DispatcherTimer _hideControlsTimer;
     private readonly UiDebouncer _anchorDebouncer = new();
 
     private IntPtr _hwnd;
     private PixelPoint _anchor;
     private bool _suppressPositionUpdate;
+    private bool _dragStarted;
 
     // 动态文本层
     private Grid _mainGrid = null!;
@@ -51,8 +53,30 @@ public sealed partial class LyricsOverlayWindow : Window
         _topmostTimer.Tick += (_, _) => Win32.AssertTopmost(_hwnd);
         _topmostTimer.Start();
 
+        _hideControlsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
+        _hideControlsTimer.Tick += (_, _) =>
+        {
+            _hideControlsTimer.Stop();
+            SetControlsVisible(false);
+        };
+
+        PointerEntered += (_, _) => { _hideControlsTimer.Stop(); SetControlsVisible(true); };
+        PointerExited += (_, _) => _hideControlsTimer.Start();
+
         _vm.PropertyChanged += OnVmChanged;
         SizeChanged += OnSizeChanged;
+    }
+
+    /// <summary>hover 显示播放控制条；移出 600ms 后隐藏。</summary>
+    private void SetControlsVisible(bool visible)
+    {
+        ControlBar.Opacity = visible ? 1 : 0;
+        ControlBar.IsHitTestVisible = visible;
+    }
+
+    private void UpdatePlayPauseIcon()
+    {
+        PlayPauseIcon.Text = _vm.IsPlaying ? "\uE769" : "\uE768"; // Pause / Play
     }
 
     private void BuildTextLayers()
@@ -191,8 +215,8 @@ public sealed partial class LyricsOverlayWindow : Window
     {
         if (e.PropertyName == nameof(OverlayViewModel.WindowVisible))
             UpdateVisibility();
-        else if (e.PropertyName == nameof(OverlayViewModel.IsUnlocked))
-            ApplyLockState();
+        else if (e.PropertyName == nameof(OverlayViewModel.IsPlaying))
+            UpdatePlayPauseIcon();
         else if (e.PropertyName is nameof(OverlayViewModel.StrokeEnabled)
                  or nameof(OverlayViewModel.StrokeThickness))
             ApplyStroke();
@@ -217,10 +241,8 @@ public sealed partial class LyricsOverlayWindow : Window
         _hwnd = TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
         Log.Info($"overlay opened, hwnd={_hwnd:X8}");
         if (_hwnd != IntPtr.Zero)
-        {
-            ApplyLockState();
             Win32.AssertTopmost(_hwnd);
-        }
+        UpdatePlayPauseIcon();
         ApplyAnchor();
         UpdateVisibility();
     }
@@ -228,6 +250,7 @@ public sealed partial class LyricsOverlayWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _topmostTimer.Stop();
+        _hideControlsTimer.Stop();
         base.OnClosed(e);
     }
 
@@ -237,34 +260,38 @@ public sealed partial class LyricsOverlayWindow : Window
             RepositionToAnchor();
     }
 
+    /// <summary>按下即拖动（控制条区域除外，避免与按钮点击冲突）。</summary>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
-        if (!_vm.IsUnlocked) return;
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-            BeginMoveDrag(e);
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            return;
+        if (IsInsideControlBar(e.Source as Avalonia.Visual))
+            return;
+        _dragStarted = true;
+        BeginMoveDrag(e);
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
-        if (!_vm.IsUnlocked) return;
-        WriteAnchorFromPosition();
+        if (_dragStarted)
+            WriteAnchorFromPosition();
+        _dragStarted = false;
     }
 
-    public void ApplyLockState()
+    private bool IsInsideControlBar(Avalonia.Visual? source)
     {
-        if (_hwnd == IntPtr.Zero) return;
-        Win32.SetClickThrough(_hwnd, !_vm.IsUnlocked);
+        while (source != null)
+        {
+            if (ReferenceEquals(source, ControlBar))
+                return true;
+            source = source.Parent as Avalonia.Visual;
+        }
+        return false;
     }
 
-    public void ApplyLockStateExternally()
-    {
-        ApplyLockState();
-        UpdateVisibility();
-    }
-
-    private void UpdateVisibility()
+    public void UpdateVisibility()
     {
         if (_vm.WindowVisible) Show(); else Hide();
     }

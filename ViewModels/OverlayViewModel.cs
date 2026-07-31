@@ -15,15 +15,14 @@ public sealed class OverlayViewModel : ObservableObject
         nameof(MainText), nameof(TransText), nameof(ShowTransLine),
         nameof(FontFamilyValue), nameof(MainFontSize), nameof(EffectiveTransFontSize), nameof(WeightValue),
         nameof(Fill), nameof(TextOpacity), nameof(MaxTextWidth), nameof(TextEffect), nameof(GlowEffect),
-        nameof(EditBackground), nameof(IsUnlocked), nameof(WindowVisible),
+        nameof(WindowVisible), nameof(IsPlaying),
         nameof(StrokeEnabled), nameof(StrokeBrush), nameof(StrokeThickness), nameof(LineSpacing),
         nameof(TextAlignment), nameof(GlowEnabled),
     ];
 
-    private static readonly IBrush UnlockedBackground = new SolidColorBrush(Color.FromArgb(0x55, 0x10, 0x10, 0x10));
-
     private readonly SettingsService _settings;
     private readonly LyricsOrchestrator _orchestrator;
+    private readonly SmtcService _smtc;
 
     private string _fillHexCache = "";
     private IBrush _fillCache = Brushes.White;
@@ -34,13 +33,26 @@ public sealed class OverlayViewModel : ObservableObject
     private string _glowKeyCache = "";
     private IEffect? _glowCache;
 
-    public OverlayViewModel(SettingsService settings, LyricsOrchestrator orchestrator)
+    public OverlayViewModel(SettingsService settings, LyricsOrchestrator orchestrator, SmtcService smtc)
     {
         _settings = settings;
         _orchestrator = orchestrator;
+        _smtc = smtc;
         _settings.Changed += () => RaiseMany(AllProps);
         _orchestrator.StateChanged += () => RaiseMany(AllProps);
+
+        PlayPauseCommand = new RelayCommand(() => _ = _smtc.TryTogglePlayPauseAsync());
+        PrevCommand = new RelayCommand(() => _ = _smtc.TrySkipPreviousAsync());
+        NextCommand = new RelayCommand(() => _ = _smtc.TrySkipNextAsync());
     }
+
+    public RelayCommand PlayPauseCommand { get; }
+
+    public RelayCommand PrevCommand { get; }
+
+    public RelayCommand NextCommand { get; }
+
+    public bool IsPlaying => _orchestrator.IsPlaying;
 
     private AppSettings S => _settings.Current;
 
@@ -60,8 +72,6 @@ public sealed class OverlayViewModel : ObservableObject
             {
                 text = FallbackText();
             }
-            if (IsUnlocked && string.IsNullOrEmpty(text))
-                return "拖动调整歌词位置 · 双击锁定";
             return text;
         }
     }
@@ -195,16 +205,10 @@ public sealed class OverlayViewModel : ObservableObject
 
     public double StrokeThickness => Math.Clamp(S.StrokeThickness, 1, 8);
 
-    public IBrush EditBackground => IsUnlocked ? UnlockedBackground : Brushes.Transparent;
-
-    public bool IsUnlocked => !S.PositionLocked;
-
     public bool WindowVisible
     {
         get
         {
-            if (IsUnlocked)
-                return true; // 解锁时必须可见，才能拖动
             if (!S.LyricsVisible)
                 return false;
             if (_orchestrator.Phase == LyricsPhase.NoSession)

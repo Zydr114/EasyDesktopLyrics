@@ -97,6 +97,34 @@ public sealed class SmtcService : IDisposable
         }
     }
 
+    // ---------- 播放控制 ----------
+
+    public Task<bool> TryTogglePlayPauseAsync() => ControlAsync(s => s.TryTogglePlayPauseAsync());
+
+    public Task<bool> TrySkipNextAsync() => ControlAsync(s => s.TrySkipNextAsync());
+
+    public Task<bool> TrySkipPreviousAsync() => ControlAsync(s => s.TrySkipPreviousAsync());
+
+    /// <summary>跳转到指定位置（100ns 单位）。</summary>
+    public Task<bool> TrySeekAsync(TimeSpan position) =>
+        ControlAsync(s => s.TryChangePlaybackPositionAsync(position.Ticks));
+
+    private async Task<bool> ControlAsync(Func<GlobalSystemMediaTransportControlsSession, IAsyncOperation<bool>> op)
+    {
+        var s = _session;
+        if (s == null)
+            return false;
+        try
+        {
+            return await op(s);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("smtc control", ex);
+            return false;
+        }
+    }
+
     public void Dispose()
     {
         _disposed = true;

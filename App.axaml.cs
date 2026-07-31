@@ -51,19 +51,11 @@ public sealed class App : Application
         _orchestrator = new LyricsOrchestrator(_smtcService, _settingsService, _lyricsCache, _overridesStore, providers);
 
         // ---- 托盘 ----
-        var overlayVm = new OverlayViewModel(_settingsService, _orchestrator);
+        var overlayVm = new OverlayViewModel(_settingsService, _orchestrator, _smtcService);
         _overlay = new LyricsOverlayWindow(overlayVm, _settingsService);
 
         _overlay.AnchorChanged += (x, y) =>
             _settingsService.Update(s => { s.AnchorX = x; s.AnchorY = y; });
-
-        var trayLock = new NativeMenuItem("锁定歌词位置")
-        {
-            ToggleType = MenuItemToggleType.CheckBox,
-            IsChecked = settings.PositionLocked,
-        };
-        trayLock.Click += (_, _) =>
-            _settingsService.Update(s => s.PositionLocked = !s.PositionLocked);
 
         var trayVisible = new NativeMenuItem("显示歌词")
         {
@@ -74,7 +66,6 @@ public sealed class App : Application
             _settingsService.Update(s => s.LyricsVisible = !s.LyricsVisible);
 
         var trayMenu = new NativeMenu();
-        trayMenu.Add(trayLock);
         trayMenu.Add(trayVisible);
         trayMenu.Add(new NativeMenuItemSeparator());
 
@@ -92,8 +83,7 @@ public sealed class App : Application
             AutoStart.Sync(_settingsService.Current.AutoStart);
             _smtcService.SetPreferredSession(_settingsService.Current.LockedSessionAumid);
             _smtcService.SetPlayerRules(_settingsService.Current.PlayerPriorities);
-            _overlay?.ApplyLockStateExternally();
-            trayLock.IsChecked = _settingsService.Current.PositionLocked;
+            _overlay?.UpdateVisibility();
             trayVisible.IsChecked = _settingsService.Current.LyricsVisible;
         };
 
