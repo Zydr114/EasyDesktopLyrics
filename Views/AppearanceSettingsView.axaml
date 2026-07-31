@@ -139,6 +139,32 @@
       </StackPanel>
     </Border>
 
+    <!-- 歌词封面 -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="cardTitle" Text="歌词封面" />
+          <TextBlock Classes="cardDesc"
+                     Text="切歌时平滑弹出专辑封面（灵动岛效果），或常驻显示在歌词一侧。" />
+        </StackPanel>
+        <Grid ColumnDefinitions="110,*,Auto" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+          <TextBlock Classes="sectionLabel" Text="显示方式" />
+          <ComboBox Grid.Column="1" ItemsSource="{Binding CoverModeOptions}"
+                    SelectedIndex="{Binding CoverModeIndex, Mode=TwoWay}" Width="160"
+                    HorizontalAlignment="Left" />
+          <TextBlock Classes="sectionLabel" Text="封面位置" Grid.Row="1" />
+          <ComboBox Grid.Column="1" Grid.Row="1" ItemsSource="{Binding CoverPositionOptions}"
+                    SelectedIndex="{Binding CoverPositionIndex, Mode=TwoWay}" Width="160"
+                    HorizontalAlignment="Left" />
+          <TextBlock Classes="sectionLabel" Text="封面尺寸" Grid.Row="2" />
+          <Slider Grid.Column="1" Grid.Row="2" Minimum="64" Maximum="256" TickFrequency="8"
+                  Value="{Binding CoverSizeVal, Mode=TwoWay}" />
+          <TextBlock Grid.Column="2" Grid.Row="2" Text="{Binding CoverSizeVal, StringFormat='{}{0:F0}'}"
+                     VerticalAlignment="Center" TextAlignment="Right" FontSize="12" Width="36" />
+        </Grid>
+      </StackPanel>
+    </Border>
+
     <!-- 显示效果 -->
     <Border Classes="card">
       <StackPanel Spacing="10">

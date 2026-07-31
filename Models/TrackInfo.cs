@@ -6,7 +6,8 @@ public sealed record TrackInfo(
     string Artist,
     string Album,
     long DurationMs,
-    string SourceAumid);
+    string SourceAumid,
+    byte[]? Cover = null);
 
 /// <summary>SMTC 播放状态 + 时间线快照（PositionAt 为 Position 的采样时刻）。</summary>
 public readonly record struct PlaybackSnapshot(

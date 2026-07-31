@@ -43,6 +43,14 @@ public sealed class AppSettings
     /// <summary>托盘“显示歌词”开关。</summary>
     public bool LyricsVisible { get; set; } = true;
 
+    // ---- 封面 ----
+    /// <summary>封面显示："off" / "transient"（切歌提示）/ "always"（常驻）。</summary>
+    public string CoverMode { get; set; } = "off";
+    /// <summary>封面位置："left" / "right"。</summary>
+    public string CoverPosition { get; set; } = "left";
+    /// <summary>封面尺寸（DIP）。</summary>
+    public double CoverSize { get; set; } = 120;
+
     // ---- SMTC ----
     /// <summary>锁定监听的播放器 AUMID；null/空 = 自动跟随系统当前会话。</summary>
     public string? LockedSessionAumid { get; set; }

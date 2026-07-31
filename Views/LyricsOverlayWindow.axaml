@@ -13,17 +13,47 @@
         SizeToContent="WidthAndHeight">
 
   <Border CornerRadius="6" Padding="12,6">
-    <Grid RowDefinitions="Auto,Auto">
-      <!-- 歌词主体 -->
-      <Viewbox Grid.Row="0" MaxWidth="{Binding MaxTextWidth}"
-               StretchDirection="DownOnly">
-        <StackPanel x:Name="RootPanel" Spacing="{Binding LineSpacing}">
-          <!-- 内容由代码后置动态构建，支持描边/辉光层切换 -->
-        </StackPanel>
-      </Viewbox>
+    <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,Auto">
+      <!-- 常驻封面（模式 always 时显示；列位置由 code-behind 切换） -->
+      <Border x:Name="PersistentCover" Grid.Row="0" Grid.Column="0"
+              CornerRadius="8" ClipToBounds="True"
+              IsVisible="False" VerticalAlignment="Center" Margin="0,0,10,0" Opacity="0">
+        <Border.Transitions>
+          <Transitions>
+            <DoubleTransition Property="Opacity" Duration="0:0:0.3" />
+          </Transitions>
+        </Border.Transitions>
+        <Image x:Name="PersistentCoverImage" Width="{Binding CoverSize}" Height="{Binding CoverSize}"
+               Stretch="UniformToFill" />
+      </Border>
+
+      <!-- 歌词区（含临时封面叠加层） -->
+      <Grid x:Name="LyricsArea" Grid.Row="0" Grid.Column="1">
+        <Viewbox MaxWidth="{Binding MaxTextWidth}"
+                 StretchDirection="DownOnly">
+          <StackPanel x:Name="RootPanel" Spacing="{Binding LineSpacing}">
+            <!-- 内容由代码后置动态构建，支持描边/辉光层切换 -->
+          </StackPanel>
+        </Viewbox>
+
+        <!-- 切歌提示封面（模式 transient 时短暂显示） -->
+        <Border x:Name="TransientCover" HorizontalAlignment="Left" VerticalAlignment="Center"
+                CornerRadius="8" ClipToBounds="True"
+                IsVisible="False" Opacity="0" IsHitTestVisible="False">
+          <Border.Transitions>
+            <Transitions>
+              <DoubleTransition Property="Opacity" Duration="0:0:0.25" />
+              <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.25" />
+            </Transitions>
+          </Border.Transitions>
+          <Image x:Name="TransientCoverImage" Width="{Binding CoverSize}" Height="{Binding CoverSize}"
+                 Stretch="UniformToFill" />
+        </Border>
+      </Grid>
 
       <!-- 播放控制条：hover 显示，位于歌词下方（高度动画展开） -->
-      <Border x:Name="ControlBar" Grid.Row="1"
+      <Border x:Name="ControlBar" Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+              VerticalAlignment="Bottom"
               Height="0" Opacity="0" IsHitTestVisible="False" ClipToBounds="True">
         <Border.Transitions>
           <Transitions>

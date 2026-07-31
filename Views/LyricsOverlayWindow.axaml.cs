@@ -24,6 +24,7 @@ public sealed partial class LyricsOverlayWindow : Window
     private readonly SettingsService _settingsService;
     private readonly DispatcherTimer _topmostTimer;
     private readonly DispatcherTimer _hideControlsTimer;
+    private readonly DispatcherTimer _transientCoverTimer;
     private readonly UiDebouncer _anchorDebouncer = new();
 
     private IntPtr _hwnd;
@@ -58,6 +59,13 @@ public sealed partial class LyricsOverlayWindow : Window
         {
             _hideControlsTimer.Stop();
             SetControlsVisible(false);
+        };
+
+        _transientCoverTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+        _transientCoverTimer.Tick += (_, _) =>
+        {
+            _transientCoverTimer.Stop();
+            HideTransientCover();
         };
 
         PointerEntered += (_, _) => { _hideControlsTimer.Stop(); SetControlsVisible(true); };
@@ -218,6 +226,11 @@ public sealed partial class LyricsOverlayWindow : Window
             UpdateVisibility();
         else if (e.PropertyName == nameof(OverlayViewModel.IsPlaying))
             UpdatePlayPauseIcon();
+        else if (e.PropertyName == nameof(OverlayViewModel.CoverImage))
+            OnCoverChanged();
+        else if (e.PropertyName is nameof(OverlayViewModel.CoverMode)
+                 or nameof(OverlayViewModel.CoverPosition))
+            ApplyCoverLayout();
         else if (e.PropertyName is nameof(OverlayViewModel.StrokeEnabled)
                  or nameof(OverlayViewModel.StrokeThickness))
             ApplyStroke();
@@ -225,6 +238,60 @@ public sealed partial class LyricsOverlayWindow : Window
             ApplyGlow();
         else if (e.PropertyName == nameof(OverlayViewModel.TextAlignment))
             ApplyAlignment();
+    }
+
+    // ---------- 封面 ----------
+
+    /// <summary>封面到达/切换：常驻模式更新常驻封面；切歌提示模式弹出临时封面。</summary>
+    private void OnCoverChanged()
+    {
+        ApplyCoverLayout();
+        if (_vm.CoverMode == "always")
+            return;
+
+        if (_vm.CoverMode == "transient" && _vm.CoverImage != null)
+        {
+            TransientCoverImage.Source = _vm.CoverImage;
+            _transientCoverTimer.Stop();
+            TransientCover.RenderTransform = new TranslateTransform(
+                _vm.CoverPosition == "left" ? -24 : 24, 0);
+            TransientCover.Opacity = 0;
+            TransientCover.IsVisible = true;
+            TransientCover.IsHitTestVisible = false;
+            TransientCover.Opacity = 1;
+            TransientCover.RenderTransform = new TranslateTransform(0, 0);
+            _transientCoverTimer.Start();
+        }
+        else
+        {
+            HideTransientCover();
+        }
+    }
+
+    /// <summary>应用封面位置布局：常驻封面列 ↔ 歌词列，临时封面水平对齐。</summary>
+    private void ApplyCoverLayout()
+    {
+        var left = _vm.CoverPosition != "right";
+        PersistentCoverImage.Source = _vm.CoverImage;
+        PersistentCover.IsVisible = _vm.CoverImage != null && _vm.CoverMode == "always";
+
+        Grid.SetColumn(PersistentCover, left ? 0 : 1);
+        Grid.SetColumn(LyricsArea, left ? 1 : 0);
+        TransientCover.HorizontalAlignment = left
+            ? Avalonia.Layout.HorizontalAlignment.Left
+            : Avalonia.Layout.HorizontalAlignment.Right;
+
+        if (_vm.CoverMode == "always" && _vm.CoverImage != null && PersistentCover.Opacity < 1)
+            PersistentCover.Opacity = 1;
+        else if (_vm.CoverMode != "always")
+            PersistentCover.Opacity = 0;
+    }
+
+    private void HideTransientCover()
+    {
+        TransientCover.Opacity = 0;
+        TransientCover.IsVisible = false;
+        TransientCoverImage.Source = null;
     }
 
     private void ApplyAlignment()
@@ -252,6 +319,7 @@ public sealed partial class LyricsOverlayWindow : Window
     {
         _topmostTimer.Stop();
         _hideControlsTimer.Stop();
+        _transientCoverTimer.Stop();
         base.OnClosed(e);
     }
 

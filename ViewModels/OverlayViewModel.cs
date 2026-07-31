@@ -1,4 +1,5 @@
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using EasyDesktopLyrics.Models;
 using EasyDesktopLyrics.Services;
 
@@ -18,6 +19,7 @@ public sealed class OverlayViewModel : ObservableObject
         nameof(WindowVisible), nameof(IsPlaying),
         nameof(StrokeEnabled), nameof(StrokeBrush), nameof(StrokeThickness), nameof(LineSpacing),
         nameof(TextAlignment), nameof(GlowEnabled),
+        nameof(CoverImage), nameof(CoverMode), nameof(CoverPosition), nameof(CoverSize),
     ];
 
     private readonly SettingsService _settings;
@@ -39,7 +41,11 @@ public sealed class OverlayViewModel : ObservableObject
         _orchestrator = orchestrator;
         _smtc = smtc;
         _settings.Changed += () => RaiseMany(AllProps);
-        _orchestrator.StateChanged += () => RaiseMany(AllProps);
+        _orchestrator.StateChanged += () =>
+        {
+            RefreshCover();
+            RaiseMany(AllProps);
+        };
 
         PlayPauseCommand = new RelayCommand(() => _ = _smtc.TryTogglePlayPauseAsync());
         PrevCommand = new RelayCommand(() => _ = _smtc.TrySkipPreviousAsync());
@@ -53,6 +59,44 @@ public sealed class OverlayViewModel : ObservableObject
     public RelayCommand NextCommand { get; }
 
     public bool IsPlaying => _orchestrator.IsPlaying;
+
+    // ---------- 封面 ----------
+
+    public string CoverMode => S.CoverMode;
+
+    public string CoverPosition => S.CoverPosition;
+
+    public double CoverSize => Math.Clamp(S.CoverSize, 64, 256);
+
+    public IImage? CoverImage { get; private set; }
+
+    private string _coverKey = "";
+
+    /// <summary>曲目变化时解码封面（限制解码尺寸，UI 线程执行）。</summary>
+    private void RefreshCover()
+    {
+        var track = _orchestrator.Track;
+        var bytes = track?.Cover;
+        var key = bytes == null ? "" : $"{track!.Title}|{track.Artist}|{bytes.Length}";
+        if (key == _coverKey)
+            return;
+        _coverKey = key;
+
+        IImage? image = null;
+        if (bytes is { Length: > 0 })
+        {
+            try
+            {
+                using var ms = new MemoryStream(bytes);
+                image = Bitmap.DecodeToWidth(ms, 512);
+            }
+            catch
+            {
+                // 封面解码失败 → 无封面
+            }
+        }
+        CoverImage = image;
+    }
 
     private AppSettings S => _settings.Current;
 

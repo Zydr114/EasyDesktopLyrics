@@ -3,6 +3,7 @@ using EasyDesktopLyrics.Infrastructure;
 using EasyDesktopLyrics.Models;
 using Windows.Foundation;
 using Windows.Media.Control;
+using Windows.Storage.Streams;
 
 namespace EasyDesktopLyrics.Services;
 
@@ -272,6 +273,8 @@ public sealed class SmtcService : IDisposable
                 return;
             try
             {
+                // 注意：不能使用 ConfigureAwait(false)——WinRT 会话/属性对象非 agile，
+                // 必须保持 UI 线程上下文；封面流读取为异步 IO，不会阻塞 UI
                 var p = await s.TryGetMediaPropertiesAsync();
                 var title = p?.Title?.Trim() ?? "";
                 if (title.Length == 0)
@@ -287,7 +290,10 @@ public sealed class SmtcService : IDisposable
                 long durationMs = 0;
                 try { durationMs = (long)s.GetTimelineProperties().EndTime.TotalMilliseconds; } catch { }
 
-                PublishTrack(new TrackInfo(title, artist ?? "", p.AlbumTitle?.Trim() ?? "", durationMs, s.SourceAppUserModelId ?? ""));
+                var cover = await ReadThumbnailAsync(p.Thumbnail);
+
+                PublishTrack(new TrackInfo(title, artist ?? "", p.AlbumTitle?.Trim() ?? "", durationMs,
+                    s.SourceAppUserModelId ?? "", cover));
                 return;
             }
             catch (Exception ex)
@@ -295,6 +301,24 @@ public sealed class SmtcService : IDisposable
                 Log.Error($"TryGetMediaProperties attempt {attempt}", ex);
                 await Task.Delay(300);
             }
+        }
+    }
+
+    private static async Task<byte[]?> ReadThumbnailAsync(IRandomAccessStreamReference? thumbnail)
+    {
+        if (thumbnail == null)
+            return null;
+        try
+        {
+            using var stream = await thumbnail.OpenReadAsync();
+            using var ms = new MemoryStream();
+            await stream.AsStreamForRead().CopyToAsync(ms);
+            return ms.Length > 0 ? ms.ToArray() : null;
+        }
+        catch (Exception ex)
+        {
+            Log.Error("read thumbnail", ex);
+            return null;
         }
     }
 
