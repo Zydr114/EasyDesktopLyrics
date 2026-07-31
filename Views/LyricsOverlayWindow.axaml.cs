@@ -319,7 +319,7 @@ public sealed partial class LyricsOverlayWindow : Window
     private static readonly TimeSpan CoverAnimTimeout = TimeSpan.FromSeconds(6);
 
     /// <summary>
-    /// 切歌（仅"上一首/下一首"触发）动画状态机：
+    /// 切歌（任意来源：播放器内切歌 / 悬浮窗上一首下一首）动画状态机：
     /// 封面先于歌词到达 → 封面以行高 300% 显示在歌词行中央（窗口收缩为封面大小，中心=歌词行锚点），
     /// 掩盖歌词加载 → 歌词 Ready/NoLyric 后（或超时）执行分支：
     /// 常驻=恢复布局并缩小移动到常驻位 / 不常驻=淡出。动画使用二次缓出。

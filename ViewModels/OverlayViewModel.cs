@@ -49,8 +49,8 @@ public sealed class OverlayViewModel : ObservableObject
         };
 
         PlayPauseCommand = new RelayCommand(() => _ = _smtc.TryTogglePlayPauseAsync());
-        PrevCommand = new RelayCommand(() => { _cutAnimationFlag = true; _ = _smtc.TrySkipPreviousAsync(); });
-        NextCommand = new RelayCommand(() => { _cutAnimationFlag = true; _ = _smtc.TrySkipNextAsync(); });
+        PrevCommand = new RelayCommand(() => _ = _smtc.TrySkipPreviousAsync());
+        NextCommand = new RelayCommand(() => _ = _smtc.TrySkipNextAsync());
     }
 
     public RelayCommand PlayPauseCommand { get; }
@@ -86,9 +86,13 @@ public sealed class OverlayViewModel : ObservableObject
 
     private string _coverKey = "";
     private string _trackKeyCache = "";
+    private bool _hadTrack;
     private bool _cutAnimationFlag;
 
-    /// <summary>消费"上一首/下一首"触发的切歌动画标记。</summary>
+    /// <summary>
+    /// 消费切歌动画标记：任何来源（播放器内切歌 / 悬浮窗按钮）的曲目变化都会置位，
+    /// 由悬浮窗消费后清空。
+    /// </summary>
     public bool ConsumeCutAnimationFlag()
     {
         var v = _cutAnimationFlag;
@@ -122,7 +126,7 @@ public sealed class OverlayViewModel : ObservableObject
         CoverImage = image;
     }
 
-    /// <summary>真正的切歌（Title|Artist 变化）才更新 CoverTrackKey。</summary>
+    /// <summary>真正的切歌（Title|Artist 变化）才更新 CoverTrackKey；并标记切歌动画。</summary>
     private void RefreshCoverTrackKey()
     {
         var t = _orchestrator.Track;
@@ -130,6 +134,10 @@ public sealed class OverlayViewModel : ObservableObject
         if (key == _trackKeyCache)
             return;
         _trackKeyCache = key;
+        // 切歌动画：任何来源的曲目变化都播；首次获得曲目（应用启动/绑定新会话）不播
+        _cutAnimationFlag = t != null && _hadTrack;
+        if (t != null)
+            _hadTrack = true;
         CoverTrackKey = key;
         Raise(nameof(CoverTrackKey));
     }
