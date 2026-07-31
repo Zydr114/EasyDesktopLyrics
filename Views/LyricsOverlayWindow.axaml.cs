@@ -76,6 +76,8 @@ public sealed partial class LyricsOverlayWindow : Window
         _lastCoverSizePct = _vm.CoverSizePct;
 
         _mainGrid.SizeChanged += (_, _) => UpdateCoverSize();
+        // 歌词行宽度变化（不同行文本长度）时封面位置跟随（靠右布局依赖歌词宽度）
+        RootPanel.SizeChanged += (_, _) => UpdateCoverPosition();
         _vm.PropertyChanged += OnVmChanged;
         SizeChanged += OnSizeChanged;
     }
@@ -350,14 +352,34 @@ public sealed partial class LyricsOverlayWindow : Window
 
     private void SetLyricsOpacity(double opacity) => LyricsViewbox.Opacity = opacity;
 
+    /// <summary>动画居中 X：窗口内容区水平中心（不受行宽/翻译行影响）。</summary>
     private double CenterOffsetX() => Math.Max(0, (OuterGrid.Bounds.Width - CoverSlot.Width) / 2);
-    private double CenterOffsetY() => Math.Max(0, (OuterGrid.Bounds.Height - CoverSlot.Height) / 2);
+
+    /// <summary>动画居中 Y：统一以原文行（主歌词行）为基准，不随翻译行显示与否变化。</summary>
+    private double CenterOffsetY()
+    {
+        var mainTop = _mainGrid.TranslatePoint(new Point(0, 0), OuterGrid)?.Y ?? 0;
+        var mainH = _mainGrid.Bounds.Height;
+        return Math.Max(0, mainTop + (mainH - CoverSlot.Height) / 2);
+    }
 
     /// <summary>常驻位置（CoverSlot 左上角）在外层 Grid 内的坐标（与封面元素同一坐标系）。</summary>
     private Point CoverSlotOffset()
     {
         var p = CoverSlot.TranslatePoint(new Point(0, 0), OuterGrid) ?? default;
         return new Point(Math.Max(0, p.X), Math.Max(0, p.Y));
+    }
+
+    /// <summary>封面位置跟随布局（歌词宽度变化等）；动画期间不移动。</summary>
+    private void UpdateCoverPosition()
+    {
+        if (_coverAnimating)
+            return;
+        if (_vm.CoverEnabled && Cover.Opacity > 0)
+        {
+            var target = CoverSlotOffset();
+            Cover.RenderTransform = new TranslateTransform(target.X, target.Y);
+        }
     }
 
     /// <summary>
@@ -384,12 +406,7 @@ public sealed partial class LyricsOverlayWindow : Window
         var left = _vm.CoverPosition != "right";
         Grid.SetColumn(CoverSlot, left ? 0 : 1);
         Grid.SetColumn(LyricsArea, left ? 1 : 0);
-
-        if (!_coverAnimating && _vm.CoverEnabled && Cover.Opacity > 0)
-        {
-            var target = CoverSlotOffset();
-            Cover.RenderTransform = new TranslateTransform(target.X, target.Y);
-        }
+        UpdateCoverPosition();
     }
 
     private void ApplyAlignment()

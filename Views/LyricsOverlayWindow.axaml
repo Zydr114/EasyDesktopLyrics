@@ -16,7 +16,8 @@
     <Grid x:Name="OuterGrid">
       <!-- 常驻布局：封面占位列 + 歌词列（列位置由 code-behind 切换） -->
       <Grid x:Name="MainGrid" ColumnDefinitions="Auto,Auto">
-        <Border x:Name="CoverSlot" Grid.Column="0" Width="0" Height="0" />
+        <Border x:Name="CoverSlot" Grid.Column="0" Width="0" Height="0"
+                VerticalAlignment="Top" />
         <Grid x:Name="LyricsArea" Grid.Column="1">
           <Viewbox x:Name="LyricsViewbox" MaxWidth="{Binding MaxTextWidth}"
                    StretchDirection="DownOnly">
