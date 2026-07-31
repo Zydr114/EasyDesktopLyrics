@@ -59,7 +59,13 @@ internal static class DebugProbes
         Console.WriteLine($"  标题:   {title}");
         Console.WriteLine();
 
-        var providers = new ILyricsProvider[] { new NeteaseLyricsProvider(), new QQMusicLyricsProvider() };
+        var providers = new ILyricsProvider[]
+        {
+            new NeteaseLyricsProvider(),
+            new QQMusicLyricsProvider(),
+            new LrclibLyricsProvider(),
+            new LocalLrcProvider(new SettingsService()),
+        };
         var matcher = LyricsMatcher.Normalize;
 
         foreach (var provider in providers)

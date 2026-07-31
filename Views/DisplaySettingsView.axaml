@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:EasyDesktopLyrics.ViewModels"
+             x:Class="EasyDesktopLyrics.Views.DisplaySettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+  <StackPanel Spacing="12">
+    <!-- 歌词行为 -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="cardTitle" Text="歌词行为" />
+          <TextBlock Classes="cardDesc" Text="控制歌词的显示方式与时机。" />
+        </StackPanel>
+        <Grid ColumnDefinitions="140,*" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6">
+          <TextBlock Classes="sectionLabel" Text="显示翻译行" />
+          <ToggleSwitch Grid.Column="1" IsChecked="{Binding ShowTranslation, Mode=TwoWay}" />
+          <TextBlock Classes="sectionLabel" Text="对齐方式" Grid.Row="1" />
+          <ComboBox Grid.Column="1" Grid.Row="1" ItemsSource="{Binding AlignmentOptions}"
+                    SelectedIndex="{Binding AlignmentIndex, Mode=TwoWay}" Width="160"
+                    HorizontalAlignment="Left" />
+          <TextBlock Classes="sectionLabel" Text="暂停时隐藏" Grid.Row="2" />
+          <ToggleSwitch Grid.Column="1" Grid.Row="2" IsChecked="{Binding HideWhenPaused, Mode=TwoWay}" />
+          <TextBlock Classes="sectionLabel" Text="无歌词显示标题" Grid.Row="3" />
+          <ToggleSwitch Grid.Column="1" Grid.Row="3"
+                        IsChecked="{Binding ShowTitleWhenNoLyric, Mode=TwoWay}" />
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <!-- 系统 -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="cardTitle" Text="系统" />
+          <TextBlock Classes="cardDesc" Text="应用级别的行为。" />
+        </StackPanel>
+        <Grid ColumnDefinitions="140,*" ColumnSpacing="10">
+          <TextBlock Classes="sectionLabel" Text="开机自启" />
+          <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoStartEnabled, Mode=TwoWay}" />
+        </Grid>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+
+</UserControl>

@@ -41,7 +41,7 @@ public sealed class SettingsService
                 var text = File.ReadAllText(AppPaths.SettingsFile);
                 var s = JsonSerializer.Deserialize(text, AppJsonContext.Default.AppSettings);
                 if (s != null)
-                    return s;
+                    return Migrate(s);
             }
         }
         catch (Exception ex)
@@ -51,6 +51,34 @@ public sealed class SettingsService
         }
         return new AppSettings();
     }
+
+    /// <summary>确保 5 个歌词源都在列表中；旧版（仅网易云/QQ）迁移为通用排序列表。</summary>
+    private static AppSettings Migrate(AppSettings s)
+    {
+        // 过滤已不存在的源（如接口失效被移除的）
+        s.LyricSources = s.LyricSources.Where(r => DefaultSourceOrder.Contains(r.SourceId)).ToList();
+
+        if (s.LyricSources.Count == 0)
+        {
+            // 旧版字段 → 排序列表
+            var order = s.NeteaseFirst ? new[] { "netease", "qq" } : new[] { "qq", "netease" };
+            s.LyricSources = order.Select(id => new LyricSourceRule
+            {
+                SourceId = id,
+                Enabled = id == "netease" ? s.NeteaseEnabled : s.QQMusicEnabled,
+            }).ToList();
+        }
+
+        // 追加未包含的源（保持用户已有顺序，新源追加到末尾）
+        foreach (var id in DefaultSourceOrder)
+        {
+            if (!s.LyricSources.Any(r => r.SourceId == id))
+                s.LyricSources.Add(new LyricSourceRule { SourceId = id, Enabled = true });
+        }
+        return s;
+    }
+
+    internal static readonly string[] DefaultSourceOrder = ["netease", "qq", "lrclib", "local"];
 
     private void SaveNow()
     {

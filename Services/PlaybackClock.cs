@@ -20,16 +20,30 @@ public sealed class PlaybackClock
 
     public void Sync(PlaybackSnapshot s)
     {
-        _basePos = s.Position;
-        _rate = s.Rate <= 0 ? 1.0 : s.Rate;
-        IsPlaying = s.IsPlaying;
         _duration = s.Duration;
+        _rate = s.Rate <= 0 ? 1.0 : s.Rate;
 
         // LastUpdatedTime 可能过期或为 0，做合法性校验后再采用
         var age = DateTimeOffset.UtcNow - s.PositionAt;
-        _baseAt = age > TimeSpan.Zero && age < TimeSpan.FromSeconds(30)
-            ? s.PositionAt
-            : DateTimeOffset.UtcNow;
+        var timelineUsable = age > TimeSpan.Zero && age < TimeSpan.FromSeconds(30);
+
+        if (timelineUsable)
+        {
+            // 时间线有效：以 SMTC 上报为准重置插值基准
+            _basePos = s.Position;
+            _baseAt = s.PositionAt;
+        }
+        else if (IsPlaying != s.IsPlaying)
+        {
+            // 时间线不可用（如网易云 PC 版恒报 Position=0 / LastUpdatedTime 无效）：
+            // 单调降级时钟，仅在播放/暂停状态边界重置基准，其余时间由挂钟驱动，
+            // 避免高频事件把进度反复重置回 0
+            _basePos = Estimate();
+            _baseAt = DateTimeOffset.UtcNow;
+        }
+        // 时间线不可用且状态未变：保持原基准，挂钟继续驱动
+
+        IsPlaying = s.IsPlaying;
     }
 
     public void Reset()

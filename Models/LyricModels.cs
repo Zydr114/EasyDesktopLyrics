@@ -6,9 +6,16 @@ public sealed record LyricLine(long TimeMs, string Text, string? Translation);
 /// <summary>解析后的整首歌词，行按时间升序。</summary>
 public sealed class LyricDocument
 {
-    public LyricDocument(IReadOnlyList<LyricLine> lines) => Lines = lines;
+    public LyricDocument(IReadOnlyList<LyricLine> lines, bool isInstrumental = false)
+    {
+        Lines = lines;
+        IsInstrumental = isInstrumental;
+    }
 
     public IReadOnlyList<LyricLine> Lines { get; }
+
+    /// <summary>true = 纯音乐：仅含作词/作曲等元信息行，显示完后切回标题。</summary>
+    public bool IsInstrumental { get; }
 }
 
 /// <summary>歌词源搜索结果条目。</summary>

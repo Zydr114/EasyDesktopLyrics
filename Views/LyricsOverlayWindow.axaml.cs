@@ -35,6 +35,7 @@ public sealed partial class LyricsOverlayWindow : Window
     private Grid _transGrid = null!;
     private TextBlock _transTb = null!;
     private readonly List<TextBlock> _strokeLayers = [];
+    private readonly List<TextBlock> _glowLayers = [];
 
     public event Action<double, double>? AnchorChanged;
 
@@ -70,6 +71,7 @@ public sealed partial class LyricsOverlayWindow : Window
         RootPanel.Children.Add(_transGrid);
 
         ApplyStroke();
+        ApplyGlow();
         ApplyAlignment();
         SyncAllBindings();
     }
@@ -149,6 +151,42 @@ public sealed partial class LyricsOverlayWindow : Window
         }
     }
 
+    /// <summary>辉光层：大模糊半径的彩色光晕副本，位于描边层之下。</summary>
+    private void ApplyGlow()
+    {
+        foreach (var s in _glowLayers)
+        {
+            _mainGrid.Children.Remove(s);
+            _transGrid.Children.Remove(s);
+        }
+        _glowLayers.Clear();
+
+        if (!_vm.GlowEnabled)
+            return;
+
+        var gm = CreateGlowLayer("MainText", "MainFontSize");
+        _mainGrid.Children.Insert(0, gm);
+        _glowLayers.Add(gm);
+
+        var gt = CreateGlowLayer("TransText", "EffectiveTransFontSize");
+        gt.Bind(TextBlock.IsVisibleProperty, new Avalonia.Data.Binding("ShowTransLine"));
+        _transGrid.Children.Insert(0, gt);
+        _glowLayers.Add(gt);
+    }
+
+    private static TextBlock CreateGlowLayer(string textProp, string sizeProp)
+    {
+        var tb = new TextBlock();
+        tb.Bind(TextBlock.TextProperty, new Avalonia.Data.Binding(textProp));
+        tb.Bind(TextBlock.FontFamilyProperty, new Avalonia.Data.Binding("FontFamilyValue"));
+        tb.Bind(TextBlock.FontWeightProperty, new Avalonia.Data.Binding("WeightValue"));
+        tb.Bind(TextBlock.FontSizeProperty, new Avalonia.Data.Binding(sizeProp));
+        tb.Bind(TextBlock.ForegroundProperty, new Avalonia.Data.Binding("Fill"));
+        tb.Bind(TextBlock.OpacityProperty, new Avalonia.Data.Binding("TextOpacity"));
+        tb.Bind(TextBlock.EffectProperty, new Avalonia.Data.Binding("GlowEffect"));
+        return tb;
+    }
+
     private void OnVmChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(OverlayViewModel.WindowVisible))
@@ -158,6 +196,8 @@ public sealed partial class LyricsOverlayWindow : Window
         else if (e.PropertyName is nameof(OverlayViewModel.StrokeEnabled)
                  or nameof(OverlayViewModel.StrokeThickness))
             ApplyStroke();
+        else if (e.PropertyName == nameof(OverlayViewModel.GlowEffect))
+            ApplyGlow();
         else if (e.PropertyName == nameof(OverlayViewModel.TextAlignment))
             ApplyAlignment();
     }
@@ -168,6 +208,7 @@ public sealed partial class LyricsOverlayWindow : Window
         _mainTb.TextAlignment = alig;
         _transTb.TextAlignment = alig;
         foreach (var s in _strokeLayers) s.TextAlignment = alig;
+        foreach (var s in _glowLayers) s.TextAlignment = alig;
     }
 
     protected override void OnOpened(EventArgs e)

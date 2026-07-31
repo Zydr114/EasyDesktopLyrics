@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Avalonia.Threading;
 using EasyDesktopLyrics.Infrastructure;
 using EasyDesktopLyrics.Models;
@@ -18,9 +19,17 @@ public enum LyricsPhase
 /// 100ms 定时器 → 二分定位当前行，仅行号变化时通知 UI。
 /// 除 ResolveCoreAsync 内部外全部运行在 UI 线程。
 /// </summary>
-public sealed class LyricsOrchestrator
+public sealed partial class LyricsOrchestrator
 {
     private static readonly TimeSpan NegativeCacheTtl = TimeSpan.FromDays(3);
+
+    /// <summary>纯音乐占位行：整首歌词仅含此类文本时视为无歌词（显示标题）。</summary>
+    [GeneratedRegex("纯音乐|伴奏|演奏曲|instrumental|no lyrics|music only", RegexOptions.IgnoreCase)]
+    private static partial Regex InstrumentalPattern();
+
+    /// <summary>作词/作曲等元信息行（纯音乐中保留显示，显示完后切回标题）。</summary>
+    [GeneratedRegex("^(作词|作曲|编曲|制作人?|OP|SP|原曲|演唱|和声|混音|母带|录音|发行|版权|企划|出品)", RegexOptions.IgnoreCase)]
+    private static partial Regex MetaInfoPattern();
 
     private readonly SettingsService _settings;
     private readonly LyricsCache _cache;
@@ -33,6 +42,7 @@ public sealed class LyricsOrchestrator
     private LyricDocument? _doc;
     private int _lineIndex = -1;
     private int _songOffsetMs;
+    private bool _instrumentalEnded;
 
     public LyricsOrchestrator(
         SmtcService smtc,
@@ -62,6 +72,12 @@ public sealed class LyricsOrchestrator
     public string CurrentMain { get; private set; } = "";
 
     public string CurrentTrans { get; private set; } = "";
+
+    /// <summary>true = 当前歌词为纯音乐（仅元信息行）。</summary>
+    public bool IsInstrumental => _doc?.IsInstrumental == true;
+
+    /// <summary>纯音乐元信息行已显示完毕（时间超过最后一行 5 秒）→ 切回标题。</summary>
+    public bool InstrumentalEnded => _instrumentalEnded;
 
     /// <summary>任何展示相关状态变化（相位/当前行/播放状态）。UI 线程回调。</summary>
     public event Action? StateChanged;
@@ -126,9 +142,13 @@ public sealed class LyricsOrchestrator
 
     private void OnPlaybackChanged(PlaybackSnapshot snapshot)
     {
+        var posBefore = _clock.Estimate();
         _clock.Sync(snapshot);
         UpdateTimer();
-        Tick(forceRaise: false);
+        // seek/时间轴跳变（>2s）时立即强制重定位当前行，不等下一次 timer tick
+        var jump = _clock.Estimate() - posBefore;
+        var seekJumped = jump > TimeSpan.FromSeconds(2) || jump < -TimeSpan.FromSeconds(2);
+        Tick(forceRaise: seekJumped);
         Raise(); // IsPlaying 可能变化
     }
 
@@ -192,7 +212,7 @@ public sealed class LyricsOrchestrator
                     }
                     else
                     {
-                        var cachedDoc = LrcParser.Parse(cached.Lrc, cached.TransLrc);
+                        var cachedDoc = ParseLyric(cached.Lrc, cached.TransLrc);
                         if (cachedDoc != null)
                             return (cachedDoc, songOffset);
                     }
@@ -207,7 +227,7 @@ public sealed class LyricsOrchestrator
             if (provider != null)
             {
                 var raw = await SafeGetLyricAsync(provider, ov.SongId, ct).ConfigureAwait(false);
-                var doc = raw != null ? LrcParser.Parse(raw.Lrc, raw.TranslationLrc) : null;
+                var doc = raw != null ? ParseLyric(raw.Lrc, raw.TranslationLrc) : null;
                 if (doc != null && raw != null)
                 {
                     await _cache.SetAsync(key, CachedLyric.Positive(provider.Id, ov.SongId, raw)).ConfigureAwait(false);
@@ -256,7 +276,7 @@ public sealed class LyricsOrchestrator
             var raw = await SafeGetLyricAsync(c.Provider, c.Song.SongId, ct).ConfigureAwait(false);
             if (raw == null)
                 continue;
-            var doc = LrcParser.Parse(raw.Lrc, raw.TranslationLrc);
+            var doc = ParseLyric(raw.Lrc, raw.TranslationLrc);
             if (doc == null)
                 continue;
 
@@ -267,6 +287,34 @@ public sealed class LyricsOrchestrator
 
         await _cache.SetAsync(key, CachedLyric.Negative()).ConfigureAwait(false);
         return (null, songOffset);
+    }
+
+    /// <summary>
+    /// 解析 LRC。纯音乐判定：排除元信息行后，无内容或全部为纯音乐占位字样。
+    /// 纯音乐且存在元信息行（作词/作曲等）→ 保留元信息行短暂显示，之后切回标题；
+    /// 否则返回 null（直接显示标题）。
+    /// </summary>
+    private static LyricDocument? ParseLyric(string? lrc, string? transLrc)
+    {
+        var doc = LrcParser.Parse(lrc, transLrc);
+        if (doc == null)
+            return null;
+
+        var texts = doc.Lines.Select(l => l.Text).Where(t => t.Length > 0).ToList();
+        if (texts.Count == 0)
+            return null;
+
+        var content = texts.Where(t => !MetaInfoPattern().IsMatch(t)).ToList();
+        if (content.Count > 0 && !content.All(t => InstrumentalPattern().IsMatch(t)))
+            return doc; // 正常歌词
+
+        // 纯音乐：保留元信息行供短暂显示
+        var meta = doc.Lines
+            .Where(l => l.Text.Length > 0 && MetaInfoPattern().IsMatch(l.Text))
+            .ToList();
+        return meta.Count > 0
+            ? new LyricDocument(meta, isInstrumental: true)
+            : null;
     }
 
     private static async Task<RawLyric?> SafeGetLyricAsync(ILyricsProvider provider, string songId, CancellationToken ct)
@@ -286,24 +334,18 @@ public sealed class LyricsOrchestrator
         }
     }
 
+    /// <summary>按设置的歌词源优先级顺序返回启用的 Provider。</summary>
     private List<ILyricsProvider> EnabledProviders()
     {
         var s = _settings.Current;
-        var list = new List<ILyricsProvider>(2);
-
-        void Add(string id)
+        var list = new List<ILyricsProvider>(s.LyricSources.Count);
+        foreach (var r in s.LyricSources)
         {
-            var p = _providers.FirstOrDefault(x => x.Id == id);
+            if (!r.Enabled)
+                continue;
+            var p = _providers.FirstOrDefault(x => x.Id == r.SourceId);
             if (p != null)
                 list.Add(p);
-        }
-
-        var order = s.NeteaseFirst ? new[] { "netease", "qq" } : ["qq", "netease"];
-        foreach (var id in order)
-        {
-            var isEnabled = id == "netease" ? s.NeteaseEnabled : s.QQMusicEnabled;
-            if (isEnabled)
-                Add(id);
         }
         return list;
     }
@@ -324,26 +366,28 @@ public sealed class LyricsOrchestrator
 
         var pos = (long)_clock.Estimate().TotalMilliseconds + _settings.Current.GlobalOffsetMs + _songOffsetMs;
         var idx = LrcParser.FindIndex(_doc.Lines, pos);
-        if (idx == _lineIndex && !forceRaise)
+
+        // 纯音乐：时间超过最后一行元信息 5 秒 → 结束显示（切回标题）
+        var ended = _doc.IsInstrumental && _doc.Lines.Count > 0
+                    && pos > _doc.Lines[^1].TimeMs + 5000;
+
+        if (idx == _lineIndex && ended == _instrumentalEnded && !forceRaise)
             return;
 
         _lineIndex = idx;
+        _instrumentalEnded = ended;
         CurrentMain = ResolveMainText(idx);
         CurrentTrans = idx >= 0 ? _doc.Lines[idx].Translation ?? "" : "";
         Raise();
     }
 
-    /// <summary>空行且距下一行超过 5 秒 → 显示 "···" 作为间奏提示。</summary>
+    /// <summary>伴奏/间奏/前奏一律显示 "···"，始终保持有内容。</summary>
     private string ResolveMainText(int idx)
     {
-        if (idx < 0) return "";
+        if (idx < 0)
+            return "\u00B7\u00B7\u00B7"; // 前奏
         var text = _doc!.Lines[idx].Text;
-        if (text.Length > 0) return text;
-        if (idx + 1 < _doc.Lines.Count && _doc.Lines[idx + 1].TimeMs - _doc.Lines[idx].TimeMs > 5000)
-            return "\u00B7\u00B7\u00B7"; // midline dots
-        if (idx == _doc.Lines.Count - 1)
-            return "\u00B7\u00B7\u00B7";
-        return text;
+        return text.Length > 0 ? text : "\u00B7\u00B7\u00B7";
     }
 
     private void Raise() => StateChanged?.Invoke();

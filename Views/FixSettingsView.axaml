@@ -1,0 +1,72 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:EasyDesktopLyrics.ViewModels"
+             x:Class="EasyDesktopLyrics.Views.FixSettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+  <StackPanel Spacing="12">
+    <!-- 当前曲目 -->
+    <Border Classes="card">
+      <StackPanel Spacing="8">
+        <TextBlock Classes="cardTitle" Text="当前曲目" />
+        <TextBlock Text="{Binding CurrentTrackText}" TextWrapping="Wrap" FontSize="13" />
+      </StackPanel>
+    </Border>
+
+    <!-- 手动搜索 -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="cardTitle" Text="手动搜索歌词" />
+          <TextBlock Classes="cardDesc"
+                     Text="自动匹配失败或错误时，搜索并指定歌词。绑定关系会持久保存。" />
+        </StackPanel>
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <TextBox Text="{Binding SearchKeyword, Mode=TwoWay}" Watermark="输入歌名 / 歌手…" />
+          <Button Grid.Column="1" Content="搜索" Command="{Binding SearchCommand}"
+                  Padding="16,4" />
+        </Grid>
+        <ListBox ItemsSource="{Binding SearchResults}"
+                 SelectedItem="{Binding SelectedResult, Mode=TwoWay}"
+                 Height="150" IsVisible="{Binding HasSearchResults}" />
+        <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" FontSize="12" Opacity="0.8" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Content="应用所选歌词" Command="{Binding ApplyResultCommand}" Padding="12,4" />
+          <Button Content="清除本曲校正" Command="{Binding ClearOverrideCommand}" Padding="12,4" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- 单曲偏移 -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="cardTitle" Text="单曲偏移" />
+          <TextBlock Classes="cardDesc"
+                     Text="只调整当前曲目的歌词快慢，不改变全局偏移。" />
+        </StackPanel>
+        <Grid ColumnDefinitions="110,*,100,Auto" ColumnSpacing="8">
+          <TextBlock Classes="sectionLabel" Text="本曲偏移 (ms)" />
+          <TextBox Grid.Column="1" Text="{Binding SongOffsetMs, Mode=TwoWay}"
+                   HorizontalContentAlignment="Right" />
+          <Button Grid.Column="3" Content="应用偏移" Command="{Binding ApplySongOffsetCommand}"
+                  Padding="12,4" />
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <!-- 缓存管理 -->
+    <Border Classes="card">
+      <StackPanel Spacing="8">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="cardTitle" Text="缓存管理" />
+          <TextBlock Classes="cardDesc"
+                     Text="歌词缓存位于 %AppData%\EasyDesktopLyrics\cache\lyrics。" />
+        </StackPanel>
+        <Button Content="清空歌词缓存" Command="{Binding ClearCacheCommand}"
+                HorizontalAlignment="Left" Padding="12,4" />
+      </StackPanel>
+    </Border>
+  </StackPanel>
+
+</UserControl>

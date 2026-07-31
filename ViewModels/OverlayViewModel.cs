@@ -14,28 +14,25 @@ public sealed class OverlayViewModel : ObservableObject
     [
         nameof(MainText), nameof(TransText), nameof(ShowTransLine),
         nameof(FontFamilyValue), nameof(MainFontSize), nameof(EffectiveTransFontSize), nameof(WeightValue),
-        nameof(Fill), nameof(TextOpacity), nameof(MaxTextWidth), nameof(TextEffect),
+        nameof(Fill), nameof(TextOpacity), nameof(MaxTextWidth), nameof(TextEffect), nameof(GlowEffect),
         nameof(EditBackground), nameof(IsUnlocked), nameof(WindowVisible),
         nameof(StrokeEnabled), nameof(StrokeBrush), nameof(StrokeThickness), nameof(LineSpacing),
-        nameof(TextAlignment),
+        nameof(TextAlignment), nameof(GlowEnabled),
     ];
 
     private static readonly IBrush UnlockedBackground = new SolidColorBrush(Color.FromArgb(0x55, 0x10, 0x10, 0x10));
 
     private readonly SettingsService _settings;
     private readonly LyricsOrchestrator _orchestrator;
-    private readonly DropShadowEffect _shadow = new()
-    {
-        OffsetX = 0,
-        OffsetY = 2,
-        BlurRadius = 8,
-        Color = Color.FromArgb(0xC0, 0x00, 0x00, 0x00),
-    };
 
     private string _fillHexCache = "";
     private IBrush _fillCache = Brushes.White;
     private string _strokeHexCache = "";
     private IBrush _strokeBrushCache = Brushes.Black;
+    private string _shadowKeyCache = "";
+    private IEffect? _shadowCache;
+    private string _glowKeyCache = "";
+    private IEffect? _glowCache;
 
     public OverlayViewModel(SettingsService settings, LyricsOrchestrator orchestrator)
     {
@@ -51,7 +48,18 @@ public sealed class OverlayViewModel : ObservableObject
     {
         get
         {
-            var text = _orchestrator.Phase == LyricsPhase.Ready ? _orchestrator.CurrentMain : FallbackText();
+            string text;
+            if (_orchestrator.Phase == LyricsPhase.Ready)
+            {
+                // 纯音乐：作词/作曲元信息显示完后切回标题
+                text = _orchestrator.IsInstrumental && _orchestrator.InstrumentalEnded
+                    ? FallbackText()
+                    : _orchestrator.CurrentMain;
+            }
+            else
+            {
+                text = FallbackText();
+            }
             if (IsUnlocked && string.IsNullOrEmpty(text))
                 return "拖动调整歌词位置 · 双击锁定";
             return text;
@@ -118,9 +126,59 @@ public sealed class OverlayViewModel : ObservableObject
 
     public double MaxTextWidth => Math.Clamp(S.MaxWidth, 200, 4000);
 
-    public object? TextEffect => S.ShadowEnabled ? _shadow : null;
+    /// <summary>投影：颜色/模糊半径/垂直偏移均可配置。</summary>
+    public IEffect? TextEffect
+    {
+        get
+        {
+            if (!S.ShadowEnabled)
+                return null;
+            var key = $"{S.ShadowColorHex}|{S.ShadowBlurRadius}|{S.ShadowOffsetY}";
+            if (_shadowKeyCache != key)
+            {
+                _shadowKeyCache = key;
+                var color = Color.TryParse(S.ShadowColorHex, out var c) ? c : Colors.Black;
+                _shadowCache = new DropShadowEffect
+                {
+                    OffsetX = 0,
+                    OffsetY = S.ShadowOffsetY,
+                    BlurRadius = Math.Clamp(S.ShadowBlurRadius, 1, 60),
+                    Opacity = 0.9,
+                    Color = color,
+                };
+            }
+            return _shadowCache;
+        }
+    }
+
+    /// <summary>辉光：大模糊半径的彩色光晕（叠加在文字下层）。</summary>
+    public IEffect? GlowEffect
+    {
+        get
+        {
+            if (!S.GlowEnabled)
+                return null;
+            var key = $"{S.GlowColorHex}|{S.GlowRadius}";
+            if (_glowKeyCache != key)
+            {
+                _glowKeyCache = key;
+                var color = Color.TryParse(S.GlowColorHex, out var c) ? c : Colors.White;
+                _glowCache = new DropShadowEffect
+                {
+                    OffsetX = 0,
+                    OffsetY = 0,
+                    BlurRadius = Math.Clamp(S.GlowRadius, 4, 60),
+                    Opacity = 0.85,
+                    Color = color,
+                };
+            }
+            return _glowCache;
+        }
+    }
 
     public bool StrokeEnabled => S.StrokeEnabled;
+
+    public bool GlowEnabled => S.GlowEnabled;
 
     public IBrush StrokeBrush
     {

@@ -1,0 +1,133 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:EasyDesktopLyrics.ViewModels"
+             x:Class="EasyDesktopLyrics.Views.PlaySettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="Border.dragRow">
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="6,0" />
+      <Setter Property="Margin" Value="0,1" />
+    </Style>
+    <Style Selector="Border.ghostCard">
+      <Setter Property="Background" Value="{DynamicResource SystemChromeLowColor}" />
+      <Setter Property="Opacity" Value="0.95" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="10,6" />
+      <Setter Property="Effect">
+        <Setter.Value>
+          <DropShadowEffect BlurRadius="12" OffsetY="4" Opacity="0.4" />
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </UserControl.Styles>
+
+  <Grid>
+    <StackPanel Spacing="12">
+      <!-- 播放器优先级 -->
+      <Border Classes="card">
+        <StackPanel Spacing="10">
+          <StackPanel Spacing="2">
+            <TextBlock Classes="cardTitle" Text="播放器优先级" />
+            <TextBlock Classes="cardDesc"
+                       Text="拖拽调整各播放器的歌词显示优先级；关闭开关 = 忽略该播放器的会话。" />
+          </StackPanel>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <TextBlock Text="多个播放器同时播放时，按列表顺序优先采用上方播放器的曲目。"
+                       FontSize="11" Opacity="0.6" TextWrapping="Wrap" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Content="刷新" Command="{Binding RefreshSessionsCommand}"
+                    Padding="12,4" VerticalAlignment="Center" />
+          </Grid>
+          <ItemsControl x:Name="PlayerList" ItemsSource="{Binding PlayerRules}" MaxHeight="240">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:PlayerRuleItem">
+                <Border Classes="dragRow">
+                  <Grid ColumnDefinitions="24,*,Auto" ColumnSpacing="8" MinHeight="34">
+                    <TextBlock Text="&#xE753;" FontFamily="Segoe Fluent Icons,Segoe MDL2 Assets"
+                               FontSize="13" Opacity="0.45" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontSize="13"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                  VerticalAlignment="Center" OnContent="" OffContent="" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <!-- 歌词源 -->
+      <Border Classes="card">
+        <StackPanel Spacing="10">
+          <StackPanel Spacing="2">
+            <TextBlock Classes="cardTitle" Text="歌词源" />
+            <TextBlock Classes="cardDesc"
+                       Text="拖拽调整各歌词源的搜索优先级；关闭开关 = 不使用该源。" />
+          </StackPanel>
+          <ItemsControl x:Name="SourceList" ItemsSource="{Binding LyricSources}" MaxHeight="240">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:LyricSourceItem">
+                <Border Classes="dragRow">
+                  <Grid ColumnDefinitions="24,*,Auto" ColumnSpacing="8" MinHeight="34">
+                    <TextBlock Text="&#xE753;" FontFamily="Segoe Fluent Icons,Segoe MDL2 Assets"
+                               FontSize="13" Opacity="0.45" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontSize="13"
+                               VerticalAlignment="Center" />
+                    <ToggleSwitch Grid.Column="2" IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                  VerticalAlignment="Center" OnContent="" OffContent="" />
+                  </Grid>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <TextBlock Text="本地歌词目录（多个用分号分隔；修改文件后请清空缓存）"
+                     FontSize="11" Opacity="0.6" />
+          <TextBox Text="{Binding LyricsFolder, Mode=TwoWay}"
+                   Watermark="例如：D:\Lyrics；E:\Music\歌词" />
+        </StackPanel>
+      </Border>
+
+      <!-- 时间偏移 -->
+      <Border Classes="card">
+        <StackPanel Spacing="10">
+          <StackPanel Spacing="2">
+            <TextBlock Classes="cardTitle" Text="时间偏移" />
+            <TextBlock Classes="cardDesc"
+                       Text="正值 = 歌词提前显示，负值 = 歌词延后。用于歌词与声音整体不同步的场景。" />
+          </StackPanel>
+          <Grid ColumnDefinitions="110,*" ColumnSpacing="10">
+            <TextBlock Classes="sectionLabel" Text="全局偏移 (ms)" />
+            <Grid Grid.Column="1" ColumnDefinitions="*,70">
+              <Slider Minimum="-5000" Maximum="5000" TickFrequency="100"
+                      Value="{Binding GlobalOffsetMs, Mode=TwoWay}" />
+              <TextBlock Grid.Column="1" Text="{Binding GlobalOffsetMs, StringFormat='{}{0}'}"
+                         VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+            </Grid>
+          </Grid>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+
+    <!-- 播放器拖拽浮动副本 -->
+    <Popup x:Name="PlayerGhostPopup" IsOpen="False"
+           Placement="AnchorAndGravity" PlacementAnchor="TopLeft" PlacementGravity="TopLeft"
+           PlacementTarget="{Binding #PlayerList}" IsLightDismissEnabled="False">
+      <Border Classes="ghostCard">
+        <TextBlock x:Name="PlayerGhostText" FontSize="13" FontWeight="Medium" />
+      </Border>
+    </Popup>
+
+    <!-- 歌词源拖拽浮动副本 -->
+    <Popup x:Name="SourceGhostPopup" IsOpen="False"
+           Placement="AnchorAndGravity" PlacementAnchor="TopLeft" PlacementGravity="TopLeft"
+           PlacementTarget="{Binding #SourceList}" IsLightDismissEnabled="False">
+      <Border Classes="ghostCard">
+        <TextBlock x:Name="SourceGhostText" FontSize="13" FontWeight="Medium" />
+      </Border>
+    </Popup>
+  </Grid>
+
+</UserControl>

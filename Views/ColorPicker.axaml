@@ -1,0 +1,48 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="EasyDesktopLyrics.Views.ColorPicker">
+
+  <StackPanel Spacing="6">
+    <!-- 饱和度/明度面板 -->
+    <Border x:Name="SvPanel" Height="120" CornerRadius="4" ClipToBounds="True"
+            Background="White" Cursor="Cross">
+      <Border x:Name="SvShade" Background="Transparent" CornerRadius="4">
+        <Canvas>
+          <Border x:Name="SvIndicator" Width="12" Height="12" CornerRadius="6"
+                  BorderBrush="White" BorderThickness="2" Background="Transparent"
+                  Canvas.Left="0" Canvas.Top="0" />
+        </Canvas>
+      </Border>
+    </Border>
+
+    <!-- 色相条 -->
+    <Border x:Name="HueBar" Height="14" CornerRadius="3" Cursor="Cross">
+      <Canvas>
+        <Border x:Name="HueIndicator" Width="6" Height="18" CornerRadius="2"
+                BorderBrush="White" BorderThickness="1.5" Background="Transparent"
+                Canvas.Left="0" Canvas.Top="-2" />
+      </Canvas>
+    </Border>
+
+    <!-- 透明度条 -->
+    <Border x:Name="AlphaBar" Height="14" CornerRadius="3" Cursor="Cross">
+      <Grid>
+        <Border Background="White" CornerRadius="3" />
+        <Border x:Name="AlphaShade" CornerRadius="3" />
+        <Canvas>
+          <Border x:Name="AlphaIndicator" Width="6" Height="18" CornerRadius="2"
+                  BorderBrush="White" BorderThickness="1.5" Background="Transparent"
+                  Canvas.Left="0" Canvas.Top="-2" />
+        </Canvas>
+      </Grid>
+    </Border>
+
+    <!-- Hex 输入 + 预览 -->
+    <Grid ColumnDefinitions="*,44" ColumnSpacing="6">
+      <TextBox x:Name="HexBox" VerticalAlignment="Center" />
+      <Border x:Name="PreviewBlock" Grid.Column="1" Width="44" Height="24"
+              CornerRadius="3" VerticalAlignment="Center" />
+    </Grid>
+  </StackPanel>
+
+</UserControl>

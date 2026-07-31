@@ -8,6 +8,7 @@ internal static class Win32
     private const int GWL_EXSTYLE = -20;
     private const int WS_EX_NOACTIVATE = 0x08000000;
     private const int WS_EX_TOOLWINDOW = 0x00000080;
+    private const int WS_EX_TRANSPARENT = 0x00000020;
     private const uint WM_NCHITTEST = 0x0084;
     private const int HTTRANSPARENT = -1;
 
@@ -15,6 +16,8 @@ internal static class Win32
     private const uint SWP_NOMOVE = 0x0002;
     private const uint SWP_NOSIZE = 0x0001;
     private const uint SWP_NOACTIVATE = 0x0010;
+    private const uint SWP_NOZORDER = 0x0004;
+    private const uint SWP_FRAMECHANGED = 0x0020;
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern int GetWindowLongW(IntPtr hWnd, int nIndex);
@@ -40,14 +43,25 @@ internal static class Win32
     private static IntPtr _subclassedHwnd;
     private static bool _clickThrough;
 
-    /// <summary>通过 WM_NCHITTEST 返回 HTTRANSPARENT 实现鼠标穿透（兼容 DirectComposition）。</summary>
+    /// <summary>
+    /// 鼠标穿透：优先系统级 WS_EX_TRANSPARENT（DirectComposition 兼容），
+    /// 叠加 WM_NCHITTEST → HTTRANSPARENT 子类化作为兜底，二者同时生效。
+    /// </summary>
     public static void SetClickThrough(IntPtr hwnd, bool enable)
     {
         if (hwnd == IntPtr.Zero) return;
 
-        // 基础样式：无焦点、不进任务栏
+        // 基础样式：无焦点、不进任务栏；enable 时加 WS_EX_TRANSPARENT
         var ex = GetWindowLongW(hwnd, GWL_EXSTYLE) | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW;
+        if (enable)
+            ex |= WS_EX_TRANSPARENT;
+        else
+            ex &= ~WS_EX_TRANSPARENT;
         SetWindowLongW(hwnd, GWL_EXSTYLE, ex);
+
+        // SWP_FRAMECHANGED 强制窗口重新应用扩展样式，否则命中测试可能沿用旧值
+        SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 
         if (enable == _clickThrough && hwnd == _subclassedHwnd) return;
         _clickThrough = enable;

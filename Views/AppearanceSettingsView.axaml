@@ -1,0 +1,209 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:EasyDesktopLyrics.ViewModels"
+             xmlns:local="using:EasyDesktopLyrics.Views"
+             x:Class="EasyDesktopLyrics.Views.AppearanceSettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+  <StackPanel Spacing="12">
+    <!-- 字体 -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="cardTitle" Text="字体" />
+          <TextBlock Classes="cardDesc" Text="歌词正文与翻译行使用的字体。" />
+        </StackPanel>
+        <ComboBox ItemsSource="{Binding FontOptions}"
+                  SelectedItem="{Binding SelectedFont, Mode=TwoWay}" />
+        <Border Padding="10,6" Background="{DynamicResource SystemAltHighColor}" CornerRadius="6">
+          <StackPanel Spacing="2">
+            <TextBlock Text="{Binding FontPreviewText}"
+                       FontFamily="{Binding SelectedFontFamily}"
+                       FontSize="24" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding SelectedFont}" FontSize="11" Opacity="0.6" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Border>
+
+    <!-- 文字 -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="cardTitle" Text="文字" />
+          <TextBlock Classes="cardDesc" Text="歌词颜色、字号与字重。" />
+        </StackPanel>
+        <Grid ColumnDefinitions="120,*" ColumnSpacing="10" RowDefinitions="Auto,Auto" RowSpacing="8">
+          <TextBlock Classes="sectionLabel" Text="颜色" />
+          <local:ColorPicker Grid.Column="1" Width="280" Color="{Binding ColorValue, Mode=TwoWay}" />
+          <TextBlock Classes="sectionLabel" Text="字号 / 字重" Grid.Row="1" />
+          <Grid Grid.Column="1" Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="10">
+            <Grid ColumnDefinitions="*,38">
+              <Slider Minimum="10" Maximum="120" TickFrequency="1"
+                      Value="{Binding FontSize, Mode=TwoWay}" />
+              <TextBlock Grid.Column="1" Text="{Binding FontSize, StringFormat='{}{0:F0}'}"
+                         VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+            </Grid>
+            <ComboBox Grid.Column="1" ItemsSource="{Binding WeightOptions}"
+                      SelectedIndex="{Binding WeightIndex, Mode=TwoWay}" />
+          </Grid>
+        </Grid>
+        <Grid ColumnDefinitions="120,*" ColumnSpacing="10">
+          <TextBlock Classes="sectionLabel" Text="翻译字号" />
+          <Grid Grid.Column="1" ColumnDefinitions="*,38">
+            <Slider Minimum="0" Maximum="80" TickFrequency="1"
+                    Value="{Binding TransFontSizeVal, Mode=TwoWay}" />
+            <TextBlock Grid.Column="1" Text="{Binding TransFontSizeVal, StringFormat='{}{0:F0}'}"
+                       VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+          </Grid>
+        </Grid>
+        <TextBlock Text="翻译字号为 0 时自动取正文字号的 60%。" FontSize="11" Opacity="0.6" />
+      </StackPanel>
+    </Border>
+
+    <!-- 特效 -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="cardTitle" Text="文字特效" />
+          <TextBlock Classes="cardDesc" Text="阴影、描边与辉光可同时启用，增强任意背景下的可读性。" />
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+          <CheckBox Content="文字阴影" IsChecked="{Binding ShadowEnabled, Mode=TwoWay}" />
+          <Border IsVisible="{Binding ShadowEnabled}" Margin="20,0,0,0">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="阴影颜色" />
+                <local:ColorPicker Grid.Column="1" Width="260" Color="{Binding ShadowColorValue, Mode=TwoWay}" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*,44" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="模糊半径" />
+                <Slider Grid.Column="1" Minimum="1" Maximum="40" TickFrequency="1"
+                        Value="{Binding ShadowBlurVal, Mode=TwoWay}" />
+                <TextBlock Grid.Column="2" Text="{Binding ShadowBlurVal, StringFormat='{}{0:F0}'}"
+                           VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*,44" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="垂直偏移" />
+                <Slider Grid.Column="1" Minimum="-20" Maximum="20" TickFrequency="1"
+                        Value="{Binding ShadowOffsetYVal, Mode=TwoWay}" />
+                <TextBlock Grid.Column="2" Text="{Binding ShadowOffsetYVal, StringFormat='{}{0:F0}'}"
+                           VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+              </Grid>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <Separator />
+
+        <StackPanel Spacing="6">
+          <CheckBox Content="文字描边" IsChecked="{Binding StrokeEnabled, Mode=TwoWay}" />
+          <Border IsVisible="{Binding StrokeEnabled}" Margin="20,0,0,0">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="描边颜色" />
+                <local:ColorPicker Grid.Column="1" Width="260" Color="{Binding StrokeColorValue, Mode=TwoWay}" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*,44" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="描边宽度" />
+                <Slider Grid.Column="1" Minimum="1" Maximum="8" TickFrequency="0.5"
+                        Value="{Binding StrokeThicknessVal, Mode=TwoWay}" />
+                <TextBlock Grid.Column="2" Text="{Binding StrokeThicknessVal, StringFormat='{}{0:F1}'}"
+                           VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+              </Grid>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <Separator />
+
+        <StackPanel Spacing="6">
+          <CheckBox Content="辉光（光晕）" IsChecked="{Binding GlowEnabled, Mode=TwoWay}" />
+          <Border IsVisible="{Binding GlowEnabled}" Margin="20,0,0,0">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="辉光颜色" />
+                <local:ColorPicker Grid.Column="1" Width="260" Color="{Binding GlowColorValue, Mode=TwoWay}" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*,44" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="辉光强度" />
+                <Slider Grid.Column="1" Minimum="4" Maximum="16" TickFrequency="1"
+                        Value="{Binding GlowRadiusVal, Mode=TwoWay}" />
+                <TextBlock Grid.Column="2" Text="{Binding GlowRadiusVal, StringFormat='{}{0:F0}'}"
+                           VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+              </Grid>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </StackPanel>
+    </Border>
+
+    <!-- 显示效果 -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="cardTitle" Text="显示效果" />
+          <TextBlock Classes="cardDesc" Text="歌词整体透明度与单行最大宽度。" />
+        </StackPanel>
+        <Grid ColumnDefinitions="110,*,44" ColumnSpacing="10" RowDefinitions="Auto,Auto" RowSpacing="8">
+          <TextBlock Classes="sectionLabel" Text="不透明度" />
+          <Slider Grid.Column="1" Minimum="0.1" Maximum="1.0" TickFrequency="0.05"
+                  Value="{Binding TextOpacity, Mode=TwoWay}" />
+          <TextBlock Grid.Column="2" Text="{Binding TextOpacity, StringFormat='{}{0:P0}'}"
+                     VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+          <TextBlock Classes="sectionLabel" Text="最大宽度" Grid.Row="1" />
+          <Grid Grid.Column="1" Grid.Row="1" ColumnDefinitions="*,38">
+            <Slider Minimum="200" Maximum="2000" TickFrequency="50"
+                    Value="{Binding MaxWidth, Mode=TwoWay}" />
+            <TextBlock Grid.Column="1" Text="{Binding MaxWidth, StringFormat='{}{0:F0}'}"
+                       VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+          </Grid>
+        </Grid>
+        <TextBlock Text="超过最大宽度的歌词行会自动等比缩小。最大宽度单位：DIP。" FontSize="11" Opacity="0.6" />
+      </StackPanel>
+    </Border>
+
+    <!-- 位置 -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="cardTitle" Text="歌词位置" />
+          <TextBlock Classes="cardDesc"
+                     Text="点击九宫格快速定位，或用滑块精细调节。解锁状态下也可直接拖动歌词窗口。" />
+        </StackPanel>
+        <StackPanel HorizontalAlignment="Left">
+          <ItemsControl ItemsSource="{Binding PositionPresets}" MaxWidth="124">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Button Content="{Binding Label}" Width="36" Height="30" Margin="2" Padding="0"
+                        Command="{Binding $parent[ItemsControl].DataContext.SnapPresetCommand}"
+                        CommandParameter="{Binding Preset, StringFormat='{}{0}'}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+        <Grid ColumnDefinitions="50,*,44" ColumnSpacing="10">
+          <TextBlock Classes="sectionLabel" Text="水平" />
+          <Slider Grid.Column="1" Minimum="5" Maximum="95" TickFrequency="1"
+                  Value="{Binding PositionXPct, Mode=TwoWay}" />
+          <TextBlock Grid.Column="2" Text="{Binding PositionXPct, StringFormat='{}{0:F0}%'}"
+                     VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+        </Grid>
+        <Grid ColumnDefinitions="50,*,44" ColumnSpacing="10">
+          <TextBlock Classes="sectionLabel" Text="垂直" />
+          <Slider Grid.Column="1" Minimum="5" Maximum="95" TickFrequency="1"
+                  Value="{Binding PositionYPct, Mode=TwoWay}" />
+          <TextBlock Grid.Column="2" Text="{Binding PositionYPct, StringFormat='{}{0:F0}%'}"
+                     VerticalAlignment="Center" TextAlignment="Right" FontSize="12" />
+        </Grid>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+
+</UserControl>

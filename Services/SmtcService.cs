@@ -23,6 +23,7 @@ public sealed class SmtcService : IDisposable
     private GlobalSystemMediaTransportControlsSession? _session;
     private TrackInfo? _current;
     private string? _preferredAumid;
+    private IReadOnlyList<PlayerPriority> _rules = [];
     private bool _disposed;
 
     public SmtcService()
@@ -63,6 +64,14 @@ public sealed class SmtcService : IDisposable
         if (_preferredAumid == aumid)
             return;
         _preferredAumid = aumid;
+        if (_manager != null)
+            RebindSession();
+    }
+
+    /// <summary>设置播放器优先级规则（列表顺序即优先级）；空列表 = 自动跟随当前会话。</summary>
+    public void SetPlayerRules(IReadOnlyList<PlayerPriority> rules)
+    {
+        _rules = rules ?? [];
         if (_manager != null)
             RebindSession();
     }
@@ -133,9 +142,7 @@ public sealed class SmtcService : IDisposable
         GlobalSystemMediaTransportControlsSession? target = null;
         try
         {
-            target = _preferredAumid != null
-                ? _manager.GetSessions().FirstOrDefault(s => s.SourceAppUserModelId == _preferredAumid)
-                : _manager.GetCurrentSession();
+            target = PickSession();
         }
         catch (Exception ex)
         {
@@ -154,6 +161,43 @@ public sealed class SmtcService : IDisposable
         ScheduleTrackRefresh(immediate: true);
         PushPlayback();
     }
+
+    /// <summary>按 锁定 → 优先级规则 → 当前会话 的顺序选择监听目标，禁用的播放器被排除。</summary>
+    private GlobalSystemMediaTransportControlsSession? PickSession()
+    {
+        var sessions = _manager!.GetSessions().ToList();
+
+        // 1. 锁定播放器
+        if (_preferredAumid != null)
+            return sessions.FirstOrDefault(s =>
+                string.Equals(s.SourceAppUserModelId, _preferredAumid, StringComparison.OrdinalIgnoreCase));
+
+        // 2. 优先级规则：启用的、且有活动会话的播放器，按列表顺序取第一个
+        foreach (var r in _rules)
+        {
+            if (!r.Enabled || string.IsNullOrEmpty(r.Aumid))
+                continue;
+            var s = sessions.FirstOrDefault(x =>
+                string.Equals(x.SourceAppUserModelId, r.Aumid, StringComparison.OrdinalIgnoreCase));
+            if (s != null)
+                return s;
+        }
+
+        // 3. 回退：当前会话（若被禁用则取第一个未被禁用的会话）
+        var current = _manager.GetCurrentSession();
+        if (current != null && !IsDisabled(current.SourceAppUserModelId))
+            return current;
+        foreach (var s in sessions)
+        {
+            if (!IsDisabled(s.SourceAppUserModelId))
+                return s;
+        }
+        return null;
+    }
+
+    private bool IsDisabled(string? aumid) =>
+        !string.IsNullOrEmpty(aumid)
+        && _rules.Any(r => !r.Enabled && string.Equals(r.Aumid, aumid, StringComparison.OrdinalIgnoreCase));
 
     private void DetachSession()
     {

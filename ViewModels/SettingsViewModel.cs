@@ -9,10 +9,53 @@ using EasyDesktopLyrics.Services.Providers;
 
 namespace EasyDesktopLyrics.ViewModels;
 
-/// <summary>SMTC 会话下拉项。</summary>
-public sealed record SessionOption(string? Aumid, string Display)
+/// <summary>设置导航项。</summary>
+public sealed record NavOption(string Icon, string Label);
+
+/// <summary>播放器优先级列表项。</summary>
+public sealed class PlayerRuleItem : ObservableObject
 {
-    public override string ToString() => Display;
+    private bool _isEnabled;
+
+    public PlayerRuleItem(string aumid, string displayName, bool enabled)
+    {
+        Aumid = aumid;
+        DisplayName = displayName;
+        _isEnabled = enabled;
+    }
+
+    public string Aumid { get; }
+
+    public string DisplayName { get; set; }
+
+    public bool IsEnabled
+    {
+        get => _isEnabled;
+        set => Set(ref _isEnabled, value);
+    }
+}
+
+/// <summary>歌词源优先级列表项。</summary>
+public sealed class LyricSourceItem : ObservableObject
+{
+    private bool _isEnabled;
+
+    public LyricSourceItem(string sourceId, string displayName, bool enabled)
+    {
+        SourceId = sourceId;
+        DisplayName = displayName;
+        _isEnabled = enabled;
+    }
+
+    public string SourceId { get; }
+
+    public string DisplayName { get; set; }
+
+    public bool IsEnabled
+    {
+        get => _isEnabled;
+        set => Set(ref _isEnabled, value);
+    }
 }
 
 /// <summary>手动搜索结果条目。</summary>
@@ -34,13 +77,14 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     private static readonly string[] SettingProps =
     [
         nameof(SelectedFont), nameof(FontSize), nameof(WeightIndex), nameof(ColorHex),
-        nameof(ColorValue), nameof(StrokeColorValue),
+        nameof(ColorValue), nameof(StrokeColorValue), nameof(GlowColorValue), nameof(ShadowColorValue),
         nameof(ShadowEnabled), nameof(StrokeEnabled), nameof(StrokeColorHex), nameof(StrokeThicknessVal),
+        nameof(GlowEnabled), nameof(GlowRadiusVal),
+        nameof(ShadowBlurVal), nameof(ShadowOffsetYVal),
         nameof(TransFontSizeVal), nameof(LineSpacingVal), nameof(TextOpacity), nameof(MaxWidth),
         nameof(ShowTranslation), nameof(HideWhenPaused), nameof(ShowTitleWhenNoLyric), nameof(AutoStartEnabled),
-        nameof(NeteaseEnabled), nameof(QQMusicEnabled), nameof(NeteaseFirst), nameof(GlobalOffsetMs),
-        nameof(SelectedSession), nameof(SelectedPresetIndex), nameof(PositionXPct), nameof(PositionYPct),
-        nameof(AlignmentIndex), nameof(SelectedFontFamily),
+        nameof(LyricsFolder), nameof(GlobalOffsetMs),
+        nameof(SelectedPresetIndex), nameof(PositionXPct), nameof(PositionYPct),        nameof(AlignmentIndex), nameof(SelectedFontFamily),
     ];
 
     private static readonly int[] WeightValues = [400, 500, 600, 700];
@@ -91,18 +135,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         ClearOverrideCommand = new RelayCommand(ClearOverride, () => _orchestrator.Track != null);
         ApplySongOffsetCommand = new RelayCommand(ApplySongOffset, () => _orchestrator.Track != null);
         ClearCacheCommand = new RelayCommand(ClearCache);
-        RefreshSessionsCommand = new RelayCommand(RefreshSessions);
-        PickColorCommand = new RelayCommand(p =>
-        {
-            if (p is string hex)
-                ColorHex = hex;
-        });
-
-        PickStrokeColorCommand = new RelayCommand(p =>
-        {
-            if (p is string hex)
-                StrokeColorHex = hex;
-        });
+        RefreshSessionsCommand = new RelayCommand(RefreshPlayerRules);
 
         SnapPresetCommand = new RelayCommand(p =>
         {
@@ -112,10 +145,38 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
 
         _settings.Changed += OnSettingsChanged;
         _orchestrator.StateChanged += OnOrchestratorChanged;
-        _smtc.SessionsChanged += RefreshSessions;
+        _smtc.SessionsChanged += RefreshPlayerRules;
 
-        RefreshSessions();
+        RefreshPlayerRules();
+        RefreshLyricSources();
         SyncFromTrack(force: true);
+    }
+
+    // ---------- 导航 ----------
+    public IReadOnlyList<NavOption> NavOptions { get; } =
+    [
+        new("\uE768", "播放"),
+        new("\uE790", "外观"),
+        new("\uE7C4", "显示"),
+        new("\uE8FD", "校正"),
+    ];
+
+    public bool PlayNavSelected => _selectedNav == 0;
+    public bool AppearanceNavSelected => _selectedNav == 1;
+    public bool DisplayNavSelected => _selectedNav == 2;
+    public bool FixNavSelected => _selectedNav == 3;
+
+    private int _selectedNav;
+
+    public int SelectedNav
+    {
+        get => _selectedNav;
+        set
+        {
+            if (Set(ref _selectedNav, value))
+                RaiseMany([nameof(PlayNavSelected), nameof(AppearanceNavSelected),
+                           nameof(DisplayNavSelected), nameof(FixNavSelected)]);
+        }
     }
 
     // ---------- 公用命令与数据 ----------
@@ -127,18 +188,6 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         new(PositionPreset.MiddleLeft,  "←", 0, 1), new(PositionPreset.Center,       "⊙", 1, 1), new(PositionPreset.MiddleRight, "→", 2, 1),
         new(PositionPreset.BottomLeft,  "↙", 0, 2), new(PositionPreset.BottomCenter, "↓", 1, 2), new(PositionPreset.BottomRight, "↘", 2, 2),
     ];
-
-    public IReadOnlyList<string> PresetColors { get; } =
-    [
-        "#FFFFFF", "#F0F0F0", "#FFD700", "#FFB347", "#FF6B6B", "#FF4500",
-        "#00FF88", "#00CED1", "#00BFFF", "#7ED6DF", "#1E90FF", "#6A5ACD",
-        "#FF69B4", "#FF1493", "#BA55D3", "#9370DB", "#C0C0C0", "#FFA07A",
-        "#98FB98", "#87CEEB",
-    ];
-
-    public RelayCommand PickColorCommand { get; }
-
-    public RelayCommand PickStrokeColorCommand { get; }
 
     // ---------- 外观 ----------
     public IReadOnlyList<string> FontOptions { get; }
@@ -198,7 +247,12 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     public Color ColorValue
     {
         get => Color.TryParse(_settings.Current.ColorHex, out var c) ? c : Colors.White;
-        set => _settings.Update(s => s.ColorHex = value.ToString().ToUpperInvariant());
+        set
+        {
+            var hex = value.ToString().ToUpperInvariant();
+            if (hex == _settings.Current.ColorHex) return;
+            _settings.Update(s => s.ColorHex = hex);
+        }
     }
 
     public bool ShadowEnabled
@@ -235,7 +289,12 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     public Color StrokeColorValue
     {
         get => Color.TryParse(_settings.Current.StrokeColorHex, out var c) ? c : Colors.Black;
-        set => _settings.Update(s => s.StrokeColorHex = value.ToString().ToUpperInvariant());
+        set
+        {
+            var hex = value.ToString().ToUpperInvariant();
+            if (hex == _settings.Current.StrokeColorHex) return;
+            _settings.Update(s => s.StrokeColorHex = hex);
+        }
     }
 
     public double StrokeThicknessVal
@@ -246,6 +305,71 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
             var v = Math.Round(value);
             if (Math.Abs(v - _settings.Current.StrokeThickness) < 0.5) return;
             _settings.Update(s => s.StrokeThickness = v);
+        }
+    }
+
+    public bool GlowEnabled
+    {
+        get => _settings.Current.GlowEnabled;
+        set
+        {
+            if (value == _settings.Current.GlowEnabled) return;
+            _settings.Update(s => s.GlowEnabled = value);
+        }
+    }
+
+    public Color GlowColorValue
+    {
+        get => Color.TryParse(_settings.Current.GlowColorHex, out var c) ? c : Colors.White;
+        set
+        {
+            var hex = value.ToString().ToUpperInvariant();
+            if (hex == _settings.Current.GlowColorHex) return;
+            _settings.Update(s => s.GlowColorHex = hex);
+        }
+    }
+
+    public double GlowRadiusVal
+    {
+        get => _settings.Current.GlowRadius;
+        set
+        {
+            var v = Math.Round(value);
+            if (Math.Abs(v - _settings.Current.GlowRadius) < 0.5) return;
+            _settings.Update(s => s.GlowRadius = v);
+        }
+    }
+
+    public Color ShadowColorValue
+    {
+        get => Color.TryParse(_settings.Current.ShadowColorHex, out var c) ? c : Colors.Black;
+        set
+        {
+            var hex = value.ToString().ToUpperInvariant();
+            if (hex == _settings.Current.ShadowColorHex) return;
+            _settings.Update(s => s.ShadowColorHex = hex);
+        }
+    }
+
+    public double ShadowBlurVal
+    {
+        get => _settings.Current.ShadowBlurRadius;
+        set
+        {
+            var v = Math.Round(value);
+            if (Math.Abs(v - _settings.Current.ShadowBlurRadius) < 0.5) return;
+            _settings.Update(s => s.ShadowBlurRadius = v);
+        }
+    }
+
+    public double ShadowOffsetYVal
+    {
+        get => _settings.Current.ShadowOffsetY;
+        set
+        {
+            var v = Math.Round(value);
+            if (Math.Abs(v - _settings.Current.ShadowOffsetY) < 0.5) return;
+            _settings.Update(s => s.ShadowOffsetY = v);
         }
     }
 
@@ -480,52 +604,79 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         }
     }
 
-    // ---------- SMTC 与歌词源 ----------
-    public ObservableCollection<SessionOption> SessionOptions { get; } = [];
+    // ---------- 播放器优先级 ----------
+    public ObservableCollection<PlayerRuleItem> PlayerRules { get; } = [];
 
-    public SessionOption? SelectedSession
+    public RelayCommand RefreshSessionsCommand { get; }
+
+    /// <summary>拖拽排序：移动列表中 from → to。</summary>
+    public void MovePlayerRule(int from, int to)
     {
-        get
-        {
-            var aumid = _settings.Current.LockedSessionAumid;
-            return SessionOptions.FirstOrDefault(o => o.Aumid == (string.IsNullOrEmpty(aumid) ? null : aumid))
-                   ?? SessionOptions.FirstOrDefault();
-        }
-        set
-        {
-            if (value is null || value.Aumid == _settings.Current.LockedSessionAumid)
-                return;
-            _settings.Update(s => s.LockedSessionAumid = value.Aumid);
-        }
+        if (from < 0 || from >= PlayerRules.Count || to < 0 || to >= PlayerRules.Count || from == to)
+            return;
+        PlayerRules.Move(from, to);
+        SavePlayerRules();
     }
 
-    public bool NeteaseEnabled
+    /// <summary>将当前列表持久化为设置（列表顺序 = 优先级）。</summary>
+    private void SavePlayerRules()
     {
-        get => _settings.Current.NeteaseEnabled;
-        set
+        _settings.Update(s =>
         {
-            if (value == _settings.Current.NeteaseEnabled) return;
-            _settings.Update(s => s.NeteaseEnabled = value);
-        }
+            s.PlayerPriorities = PlayerRules
+                .Select(r => new PlayerPriority { Aumid = r.Aumid, Enabled = r.IsEnabled })
+                .ToList();
+        });
     }
 
-    public bool QQMusicEnabled
+    /// <summary>合并持久化规则与当前活动会话，重建列表（顺序 = 优先级）。</summary>
+    private void RefreshPlayerRules()
     {
-        get => _settings.Current.QQMusicEnabled;
-        set
+        var displayNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (aumid, display) in _smtc.GetSessions())
+            displayNames[aumid] = display;
+
+        var items = new List<PlayerRuleItem>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var p in _settings.Current.PlayerPriorities)
         {
-            if (value == _settings.Current.QQMusicEnabled) return;
-            _settings.Update(s => s.QQMusicEnabled = value);
+            if (string.IsNullOrEmpty(p.Aumid) || !seen.Add(p.Aumid))
+                continue;
+            items.Add(new PlayerRuleItem(p.Aumid, displayNames.GetValueOrDefault(p.Aumid) ?? p.Aumid, p.Enabled));
         }
+
+        foreach (var (aumid, display) in _smtc.GetSessions())
+        {
+            if (!seen.Add(aumid))
+                continue;
+            items.Add(new PlayerRuleItem(aumid, display, true));
+        }
+
+        foreach (var item in items)
+            item.PropertyChanged += OnRuleItemChanged;
+
+        PlayerRules.Clear();
+        foreach (var item in items)
+            PlayerRules.Add(item);
     }
 
-    public bool NeteaseFirst
+    private void OnRuleItemChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        get => _settings.Current.NeteaseFirst;
+        if (e.PropertyName == nameof(PlayerRuleItem.IsEnabled))
+            SavePlayerRules();
+    }
+
+    // ---------- 歌词源 ----------
+    public ObservableCollection<LyricSourceItem> LyricSources { get; } = [];
+
+    public string LyricsFolder
+    {
+        get => _settings.Current.LyricsFolder;
         set
         {
-            if (value == _settings.Current.NeteaseFirst) return;
-            _settings.Update(s => s.NeteaseFirst = value);
+            if (value == _settings.Current.LyricsFolder) return;
+            _settings.Update(s => s.LyricsFolder = value);
         }
     }
 
@@ -539,6 +690,57 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
             _settings.Update(s => s.GlobalOffsetMs = v);
         }
     }
+
+    /// <summary>拖拽排序：移动列表中 from → to。</summary>
+    public void MoveLyricSource(int from, int to)
+    {
+        if (from < 0 || from >= LyricSources.Count || to < 0 || to >= LyricSources.Count || from == to)
+            return;
+        LyricSources.Move(from, to);
+        SaveLyricSources();
+    }
+
+    private void SaveLyricSources()
+    {
+        _settings.Update(s =>
+        {
+            s.LyricSources = LyricSources
+                .Select(r => new LyricSourceRule { SourceId = r.SourceId, Enabled = r.IsEnabled })
+                .ToList();
+        });
+    }
+
+    /// <summary>从设置重建歌词源列表（固定 5 源，顺序 = 优先级）。</summary>
+    private void RefreshLyricSources()
+    {
+        var items = new List<LyricSourceItem>();
+        foreach (var r in _settings.Current.LyricSources)
+        {
+            if (!SourceNames.TryGetValue(r.SourceId, out var name))
+                continue;
+            items.Add(new LyricSourceItem(r.SourceId, name, r.Enabled));
+        }
+        foreach (var item in items)
+            item.PropertyChanged += OnSourceItemChanged;
+
+        LyricSources.Clear();
+        foreach (var item in items)
+            LyricSources.Add(item);
+    }
+
+    private void OnSourceItemChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(LyricSourceItem.IsEnabled))
+            SaveLyricSources();
+    }
+
+    private static readonly Dictionary<string, string> SourceNames = new()
+    {
+        ["netease"] = "网易云音乐",
+        ["qq"] = "QQ 音乐",
+        ["lrclib"] = "LRCLIB",
+        ["local"] = "本地歌词文件",
+    };
 
     // ---------- 手动校正 ----------
     public string CurrentTrackText
@@ -616,13 +818,11 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
 
     public RelayCommand ClearCacheCommand { get; }
 
-    public RelayCommand RefreshSessionsCommand { get; }
-
     public void Dispose()
     {
         _settings.Changed -= OnSettingsChanged;
         _orchestrator.StateChanged -= OnOrchestratorChanged;
-        _smtc.SessionsChanged -= RefreshSessions;
+        _smtc.SessionsChanged -= RefreshPlayerRules;
     }
 
     private static IReadOnlyList<string> LoadFontOptions()
@@ -672,20 +872,6 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
             }
             SongOffsetMs = _overrides.Get(LyricsMatcher.TrackKey(t))?.OffsetMs ?? 0;
         }
-    }
-
-    private void RefreshSessions()
-    {
-        var current = _settings.Current.LockedSessionAumid;
-        SessionOptions.Clear();
-        SessionOptions.Add(new SessionOption(null, "自动（跟随系统当前会话）"));
-        foreach (var (aumid, display) in _smtc.GetSessions())
-            SessionOptions.Add(new SessionOption(aumid, display));
-
-        if (!string.IsNullOrEmpty(current) && SessionOptions.All(o => o.Aumid != current))
-            SessionOptions.Add(new SessionOption(current, $"{current}（未运行）"));
-
-        Raise(nameof(SelectedSession));
     }
 
     private async Task RunSearchAsync()
