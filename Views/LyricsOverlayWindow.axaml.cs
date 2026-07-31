@@ -26,6 +26,7 @@ public sealed partial class LyricsOverlayWindow : Window
     private readonly DispatcherTimer _topmostTimer;
     private readonly DispatcherTimer _hideControlsTimer;
     private readonly DispatcherTimer _coverStageTimer;
+    private readonly DispatcherTimer _coverTimeoutTimer;
     private readonly UiDebouncer _anchorDebouncer = new();
 
     private IntPtr _hwnd;
@@ -65,8 +66,11 @@ public sealed partial class LyricsOverlayWindow : Window
             SetControlsVisible(false);
         };
 
-        _coverStageTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
+        _coverStageTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
         _coverStageTimer.Tick += (_, _) => OnCoverStage();
+
+        _coverTimeoutTimer = new DispatcherTimer { Interval = CoverAnimTimeout };
+        _coverTimeoutTimer.Tick += (_, _) => OnCoverStage();
 
         PointerEntered += (_, _) => { _hideControlsTimer.Stop(); SetControlsVisible(true); };
         PointerExited += (_, _) => _hideControlsTimer.Start();
@@ -233,6 +237,8 @@ public sealed partial class LyricsOverlayWindow : Window
             UpdateVisibility();
         else if (e.PropertyName == nameof(OverlayViewModel.IsPlaying))
             UpdatePlayPauseIcon();
+        else if (e.PropertyName == nameof(OverlayViewModel.Phase))
+            OnLyricsPhaseChanged();
         else if (e.PropertyName == nameof(OverlayViewModel.CoverTrackKey))
             OnCoverChanged();
         else if (e.PropertyName == nameof(OverlayViewModel.CoverImage))
@@ -276,9 +282,6 @@ public sealed partial class LyricsOverlayWindow : Window
 
     private double _coverSize;
 
-    /// <summary>动画期间封面放大倍数（居中时更突出，随后缩小并移动回常驻位）。</summary>
-    private const double CoverAnimScale = 1.5;
-
     /// <summary>构建 translate 变换（Parse 不接受小数，用 Builder）。</summary>
     private static TransformOperations Translate(double x, double y)
     {
@@ -287,10 +290,17 @@ public sealed partial class LyricsOverlayWindow : Window
         return b.Build();
     }
 
+    /// <summary>动画封面尺寸 = 歌词行高度 × 该倍数（掩盖歌词加载，居中于歌词行位置）。</summary>
+    private const double CoverAnimScale = 3.0;
+
+    /// <summary>歌词加载完成的等待超时（防封面卡死）。</summary>
+    private static readonly TimeSpan CoverAnimTimeout = TimeSpan.FromSeconds(6);
+
     /// <summary>
     /// 切歌（仅"上一首/下一首"触发）动画状态机：
-    /// T0 歌词淡出 + 封面放大居中淡入 → 0.8s 后分支（常驻=缩小并移动到常驻位 / 不常驻=封面淡出）→ 歌词淡入。
-    /// 非手动切歌：常驻封面直接淡入常驻位，否则仅更新歌词。
+    /// 封面先于歌词到达 → 封面以行高 300% 显示在歌词行中央（窗口收缩为封面大小，中心=歌词行锚点），
+    /// 掩盖歌词加载 → 歌词 Ready/NoLyric 后（或超时）执行分支：
+    /// 常驻=恢复布局并缩小移动到常驻位 / 不常驻=淡出。动画使用二次缓出。
     /// </summary>
     private void OnCoverChanged()
     {
@@ -314,9 +324,10 @@ public sealed partial class LyricsOverlayWindow : Window
         {
             _coverAnimating = true;
             _coverStageTimer.Stop();
+            _coverTimeoutTimer.Stop();
             SetLyricsOpacity(0);
 
-            // 大封面在歌词左侧外挂：动画期间临时收起对称占位与歌词区域上限，控制窗口宽度
+            // 窗口收缩为封面大小：封面中心 = 窗口中心 = 歌词行原中心（锚点居中）
             var animSize = AnimCoverSize();
             LyricsArea.MinWidth = 0;
             CoverSlot.Width = animSize;
@@ -326,10 +337,9 @@ public sealed partial class LyricsOverlayWindow : Window
             CoverImage.Width = animSize;
             CoverImage.Height = animSize;
 
-            var mainTop = _mainGrid.TranslatePoint(new Point(0, 0), OuterGrid)?.Y ?? 0;
-            Cover.RenderTransform = Translate(0, mainTop);
+            Cover.RenderTransform = Translate(0, 0);
             Cover.Opacity = 1;
-            _coverStageTimer.Start();
+            _coverTimeoutTimer.Start();
             Log.Info($"cover: animation started, size={animSize:F0}");
             return;
         }
@@ -349,15 +359,28 @@ public sealed partial class LyricsOverlayWindow : Window
         }
     }
 
+    /// <summary>歌词加载完成（Ready/NoLyric）→ 动画进入结束阶段；超时强制结束。</summary>
+    private void OnLyricsPhaseChanged()
+    {
+        if (!_coverAnimating)
+            return;
+        if (_vm.Phase is LyricsPhase.Ready or LyricsPhase.NoLyric)
+        {
+            _coverStageTimer.Interval = TimeSpan.FromMilliseconds(400);
+            _coverStageTimer.Start();
+        }
+    }
+
     private void OnCoverStage()
     {
         _coverStageTimer.Stop();
+        _coverTimeoutTimer.Stop();
         if (!_coverAnimating)
             return;
 
         if (_vm.CoverEnabled)
         {
-            // 分支 A：恢复歌词区域上限与对称占位，封面缩小并移动到常驻位置
+            // 分支 A：恢复歌词布局与对称占位，封面缩小并移动到常驻位置
             LyricsArea.MinWidth = _vm.MaxTextWidth;
             CoverSlot.Width = _coverSize;
             CoverSlot.Height = _coverSize;
@@ -372,7 +395,7 @@ public sealed partial class LyricsOverlayWindow : Window
         }
         else
         {
-            // 分支 B：占位收起，封面淡出，恢复歌词
+            // 分支 B：恢复歌词布局，封面淡出
             LyricsArea.MinWidth = _vm.MaxTextWidth;
             CoverSlot.Width = 0;
             CoverSlot.Height = 0;
@@ -388,12 +411,13 @@ public sealed partial class LyricsOverlayWindow : Window
 
     private void SetLyricsOpacity(double opacity) => LyricsViewbox.Opacity = opacity;
 
-    /// <summary>动画封面尺寸：单行歌词宽度 × 300%，上限为主屏工作区高度（防超屏）。</summary>
+    /// <summary>动画封面尺寸：歌词行高度 × 300%（兜底 40px）。</summary>
     private double AnimCoverSize()
     {
-        var w = Math.Max(0, RootPanel.Bounds.Width * CoverAnimScale);
-        var screenH = Screens.Primary?.WorkingArea.Height / (Screens.Primary?.Scaling ?? 1.0) ?? 0;
-        return screenH > 0 ? Math.Min(w, screenH * 0.9) : w;
+        var h = _mainGrid.Bounds.Height;
+        if (h <= 0)
+            h = 40;
+        return h * CoverAnimScale;
     }
 
     /// <summary>常驻位置（CoverSlot 左上角）在外层 Grid 内的坐标（与封面元素同一坐标系）。</summary>
@@ -471,6 +495,7 @@ public sealed partial class LyricsOverlayWindow : Window
         _topmostTimer.Stop();
         _hideControlsTimer.Stop();
         _coverStageTimer.Stop();
+        _coverTimeoutTimer.Stop();
         base.OnClosed(e);
     }
 

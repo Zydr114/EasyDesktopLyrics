@@ -21,11 +21,11 @@
         <Grid x:Name="LyricsArea" Grid.Column="1">
           <Viewbox x:Name="LyricsViewbox" MaxWidth="{Binding MaxTextWidth}"
                    StretchDirection="DownOnly">
-            <Viewbox.Transitions>
-              <Transitions>
-                <DoubleTransition Property="Opacity" Duration="0:0:0.3" />
-              </Transitions>
-            </Viewbox.Transitions>
+          <Viewbox.Transitions>
+            <Transitions>
+              <DoubleTransition Property="Opacity" Duration="0:0:0.3" Easing="QuadraticEaseOut" />
+            </Transitions>
+          </Viewbox.Transitions>
             <StackPanel x:Name="RootPanel" Spacing="{Binding LineSpacing}">
               <!-- 内容由代码后置动态构建，支持描边/辉光层切换 -->
             </StackPanel>
@@ -41,15 +41,15 @@
               IsHitTestVisible="False" Opacity="0">
         <Border.Transitions>
           <Transitions>
-            <DoubleTransition Property="Opacity" Duration="0:0:0.25" />
-            <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.4" />
+            <DoubleTransition Property="Opacity" Duration="0:0:0.25" Easing="QuadraticEaseOut" />
+            <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.45" Easing="QuadraticEaseOut" />
           </Transitions>
         </Border.Transitions>
         <Image x:Name="CoverImage" Stretch="UniformToFill">
           <Image.Transitions>
             <Transitions>
-              <DoubleTransition Property="Width" Duration="0:0:0.4" />
-              <DoubleTransition Property="Height" Duration="0:0:0.4" />
+              <DoubleTransition Property="Width" Duration="0:0:0.45" Easing="QuadraticEaseOut" />
+              <DoubleTransition Property="Height" Duration="0:0:0.45" Easing="QuadraticEaseOut" />
             </Transitions>
           </Image.Transitions>
         </Image>

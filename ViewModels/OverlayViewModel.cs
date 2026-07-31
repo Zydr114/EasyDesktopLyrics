@@ -16,7 +16,7 @@ public sealed class OverlayViewModel : ObservableObject
         nameof(MainText), nameof(TransText), nameof(ShowTransLine),
         nameof(FontFamilyValue), nameof(MainFontSize), nameof(EffectiveTransFontSize), nameof(WeightValue),
         nameof(Fill), nameof(TextOpacity), nameof(MaxTextWidth), nameof(TextEffect), nameof(GlowEffect),
-        nameof(WindowVisible), nameof(IsPlaying),
+        nameof(WindowVisible), nameof(IsPlaying), nameof(Phase),
         nameof(StrokeEnabled), nameof(StrokeBrush), nameof(StrokeThickness), nameof(LineSpacing),
         nameof(TextAlignment), nameof(GlowEnabled),
         nameof(CoverImage), nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverSizePct),
@@ -60,6 +60,9 @@ public sealed class OverlayViewModel : ObservableObject
     public RelayCommand NextCommand { get; }
 
     public bool IsPlaying => _orchestrator.IsPlaying;
+
+    /// <summary>歌词解析相位（切歌动画以此判定歌词加载完成）。</summary>
+    public LyricsPhase Phase => _orchestrator.Phase;
 
     // ---------- 封面 ----------
 
