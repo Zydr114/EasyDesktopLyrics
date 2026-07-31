@@ -73,6 +73,7 @@ public sealed partial class LyricsOverlayWindow : Window
 
         _lastCoverEnabled = _vm.CoverEnabled;
         _lastCoverSizePct = _vm.CoverSizePct;
+        LyricsArea.MinWidth = _vm.MaxTextWidth;
 
         _mainGrid.SizeChanged += (_, _) => UpdateCoverSize();
         // 歌词行宽度变化（不同行文本长度）时封面位置跟随（靠右布局依赖歌词宽度）
@@ -240,6 +241,12 @@ public sealed partial class LyricsOverlayWindow : Window
             if (_vm.CoverImage != null)
                 CoverImage.Source = _vm.CoverImage;
         }
+        else if (e.PropertyName == nameof(OverlayViewModel.MaxTextWidth))
+        {
+            // 歌词区域宽度上限变化：常驻时同步（动画期间由动画状态管理）
+            if (!_coverAnimating)
+                LyricsArea.MinWidth = _vm.MaxTextWidth;
+        }
         else if (e.PropertyName == nameof(OverlayViewModel.CoverEnabled))
         {
             // 播放状态广播频繁且值可能未变：仅值真正变化时才处理
@@ -309,12 +316,13 @@ public sealed partial class LyricsOverlayWindow : Window
             _coverStageTimer.Stop();
             SetLyricsOpacity(0);
 
-            // 大封面在歌词左侧外挂：左右对称占位扩展窗口，歌词保持居中
+            // 大封面在歌词左侧外挂：动画期间临时收起对称占位与歌词区域上限，控制窗口宽度
             var animSize = AnimCoverSize();
+            LyricsArea.MinWidth = 0;
             CoverSlot.Width = animSize;
             CoverSlot.Height = animSize;
-            RightPad.Width = animSize;
-            RightPad.Height = animSize;
+            RightPad.Width = 0;
+            RightPad.Height = 0;
             CoverImage.Width = animSize;
             CoverImage.Height = animSize;
 
@@ -349,7 +357,8 @@ public sealed partial class LyricsOverlayWindow : Window
 
         if (_vm.CoverEnabled)
         {
-            // 分支 A：占位缩回常驻尺寸，封面缩小并移动到常驻位置
+            // 分支 A：恢复歌词区域上限与对称占位，封面缩小并移动到常驻位置
+            LyricsArea.MinWidth = _vm.MaxTextWidth;
             CoverSlot.Width = _coverSize;
             CoverSlot.Height = _coverSize;
             RightPad.Width = _coverSize;
@@ -364,6 +373,7 @@ public sealed partial class LyricsOverlayWindow : Window
         else
         {
             // 分支 B：占位收起，封面淡出，恢复歌词
+            LyricsArea.MinWidth = _vm.MaxTextWidth;
             CoverSlot.Width = 0;
             CoverSlot.Height = 0;
             RightPad.Width = 0;
