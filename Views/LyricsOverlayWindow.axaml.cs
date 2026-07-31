@@ -327,8 +327,10 @@ public sealed partial class LyricsOverlayWindow : Window
             _coverTimeoutTimer.Stop();
             SetLyricsOpacity(0);
 
-            // 窗口收缩为封面大小：封面中心 = 窗口中心 = 歌词行原中心（锚点居中）
+            // 窗口收缩为封面大小：歌词区移出布局（IsVisible=false 不占空间），
+            // 封面中心 = 窗口中心 = 锚点 = 歌词行原中心
             var animSize = AnimCoverSize();
+            LyricsArea.IsVisible = false;
             LyricsArea.MinWidth = 0;
             CoverSlot.Width = animSize;
             CoverSlot.Height = animSize;
@@ -381,6 +383,7 @@ public sealed partial class LyricsOverlayWindow : Window
         if (_vm.CoverEnabled)
         {
             // 分支 A：恢复歌词布局与对称占位，封面缩小并移动到常驻位置
+            LyricsArea.IsVisible = true;
             LyricsArea.MinWidth = _vm.MaxTextWidth;
             CoverSlot.Width = _coverSize;
             CoverSlot.Height = _coverSize;
@@ -396,6 +399,7 @@ public sealed partial class LyricsOverlayWindow : Window
         else
         {
             // 分支 B：恢复歌词布局，封面淡出
+            LyricsArea.IsVisible = true;
             LyricsArea.MinWidth = _vm.MaxTextWidth;
             CoverSlot.Width = 0;
             CoverSlot.Height = 0;
