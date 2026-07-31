@@ -34,6 +34,8 @@ public sealed partial class LyricsOverlayWindow : Window
     private bool _suppressPositionUpdate;
     private bool _dragStarted;
     private bool _coverAnimating;
+    private double _coverAnimSize;
+    private double _animWindowWidth;
     private bool _lastCoverEnabled;
     private double _lastCoverSizePct;
 
@@ -86,9 +88,11 @@ public sealed partial class LyricsOverlayWindow : Window
         SizeChanged += OnSizeChanged;
     }
 
-    /// <summary>hover 显示播放控制条（歌词下方展开）；移出 200ms 后收起。</summary>
+    /// <summary>hover 显示播放控制条（内容下方展开）；动画期间不显示（避免窗口高度变化干扰）。</summary>
     private void SetControlsVisible(bool visible)
     {
+        if (visible && _coverAnimating)
+            return; // 切歌动画期间保持隐藏
         ControlBar.Height = visible ? 34 : 0;
         ControlBar.Opacity = visible ? 1 : 0;
         ControlBar.IsHitTestVisible = visible;
@@ -326,23 +330,24 @@ public sealed partial class LyricsOverlayWindow : Window
             _coverStageTimer.Stop();
             _coverTimeoutTimer.Stop();
             SetLyricsOpacity(0);
+            _coverAnimSize = AnimCoverSize();
 
-            // 窗口收缩为封面大小：歌词区移出布局（IsVisible=false 不占空间），
-            // 封面中心 = 窗口中心 = 锚点 = 歌词行原中心
-            var animSize = AnimCoverSize();
+            // 窗口宽度锁定不变（封面水平居中于歌词行位置），高度撑到封面高；
+            // 布局稳定后封面从顶边滑入（避免窗口跳变暴露）
+            _animWindowWidth = ClientSize.Width;
+            MinWidth = _animWindowWidth;
             LyricsArea.IsVisible = false;
             LyricsArea.MinWidth = 0;
-            CoverSlot.Width = animSize;
-            CoverSlot.Height = animSize;
+            CoverSlot.Width = 0;
+            CoverSlot.Height = _coverAnimSize;
             RightPad.Width = 0;
             RightPad.Height = 0;
-            CoverImage.Width = animSize;
-            CoverImage.Height = animSize;
+            CoverImage.Width = _coverAnimSize;
+            CoverImage.Height = _coverAnimSize;
+            Cover.Opacity = 0;
 
-            Cover.RenderTransform = Translate(0, 0);
-            Cover.Opacity = 1;
-            _coverTimeoutTimer.Start();
-            Log.Info($"cover: animation started, size={animSize:F0}");
+            _ = ShowCoverAfterLayoutAsync();
+            Log.Info($"cover: animation started, size={_coverAnimSize:F0}");
             return;
         }
 
@@ -359,6 +364,20 @@ public sealed partial class LyricsOverlayWindow : Window
         {
             Cover.Opacity = 0;
         }
+    }
+
+    /// <summary>布局稳定后封面从顶边滑入（水平居中于窗口 = 歌词行中心）。</summary>
+    private async Task ShowCoverAfterLayoutAsync()
+    {
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Normal);
+        if (!_coverAnimating)
+            return;
+
+        var cx = Math.Max(0, (OuterGrid.Bounds.Width - _coverAnimSize) / 2);
+        Cover.RenderTransform = Translate(cx, -_coverAnimSize); // 顶边外
+        Cover.Opacity = 1;
+        Cover.RenderTransform = Translate(cx, 0);               // 顶边滑入（缓出）
+        _coverTimeoutTimer.Start();
     }
 
     /// <summary>歌词加载完成（Ready/NoLyric）→ 动画进入结束阶段；超时强制结束。</summary>
@@ -382,34 +401,49 @@ public sealed partial class LyricsOverlayWindow : Window
 
         if (_vm.CoverEnabled)
         {
-            // 分支 A：恢复歌词布局与对称占位，封面缩小并移动到常驻位置
+            // 分支 A：封面在中心淡出并恢复窗口布局；常驻封面随后在常驻位淡入（交叉淡化）
             LyricsArea.IsVisible = true;
             LyricsArea.MinWidth = _vm.MaxTextWidth;
             CoverSlot.Width = _coverSize;
             CoverSlot.Height = _coverSize;
             RightPad.Width = _coverSize;
             RightPad.Height = _coverSize;
-            CoverImage.Width = _coverSize;
-            CoverImage.Height = _coverSize;
-            var target = CoverSlotOffset();
-            Cover.RenderTransform = Translate(target.X, target.Y);
+            MinWidth = 0;
+            Cover.Opacity = 0;
             SetLyricsOpacity(1);
             _coverAnimating = false;
+            _ = ShowPersistentCoverAsync();
         }
         else
         {
-            // 分支 B：恢复歌词布局，封面淡出
+            // 分支 B：封面原地（中心）淡出，恢复窗口布局
             LyricsArea.IsVisible = true;
             LyricsArea.MinWidth = _vm.MaxTextWidth;
             CoverSlot.Width = 0;
             CoverSlot.Height = 0;
             RightPad.Width = 0;
             RightPad.Height = 0;
+            MinWidth = 0;
             CoverImage.Width = _coverSize;
             CoverImage.Height = _coverSize;
             Cover.Opacity = 0;
             SetLyricsOpacity(1);
             _coverAnimating = false;
+        }
+    }
+
+    /// <summary>常驻封面：布局稳定后在常驻位淡入。</summary>
+    private async Task ShowPersistentCoverAsync()
+    {
+        await Task.Delay(350);
+        if (_vm.CoverEnabled && !_coverAnimating)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Normal);
+            CoverImage.Width = _coverSize;
+            CoverImage.Height = _coverSize;
+            var target = CoverSlotOffset();
+            Cover.RenderTransform = Translate(target.X, target.Y);
+            Cover.Opacity = 1;
         }
     }
 
