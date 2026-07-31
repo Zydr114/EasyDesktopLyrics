@@ -32,6 +32,9 @@ public sealed partial class LyricsOverlayWindow : Window
     private bool _suppressPositionUpdate;
     private bool _dragStarted;
     private bool _coverAnimating;
+    private bool _lastCoverEnabled;
+    private string _lastCoverPosition = "";
+    private double _lastCoverSizePct;
 
     // 动态文本层
     private Grid _mainGrid = null!;
@@ -67,6 +70,10 @@ public sealed partial class LyricsOverlayWindow : Window
 
         PointerEntered += (_, _) => { _hideControlsTimer.Stop(); SetControlsVisible(true); };
         PointerExited += (_, _) => _hideControlsTimer.Start();
+
+        _lastCoverEnabled = _vm.CoverEnabled;
+        _lastCoverPosition = _vm.CoverPosition;
+        _lastCoverSizePct = _vm.CoverSizePct;
 
         _mainGrid.SizeChanged += (_, _) => UpdateCoverSize();
         _vm.PropertyChanged += OnVmChanged;
@@ -232,14 +239,29 @@ public sealed partial class LyricsOverlayWindow : Window
             if (_vm.CoverImage != null)
                 CoverImage.Source = _vm.CoverImage;
         }
-        else if (e.PropertyName is nameof(OverlayViewModel.CoverEnabled)
-                 or nameof(OverlayViewModel.CoverPosition))
+        else if (e.PropertyName == nameof(OverlayViewModel.CoverEnabled))
         {
+            // 播放状态广播频繁且值可能未变：仅值真正变化时才处理
+            if (_vm.CoverEnabled == _lastCoverEnabled)
+                return;
+            _lastCoverEnabled = _vm.CoverEnabled;
             ApplyCoverLayout();
             UpdateCoverSize();
         }
+        else if (e.PropertyName == nameof(OverlayViewModel.CoverPosition))
+        {
+            if (_vm.CoverPosition == _lastCoverPosition)
+                return;
+            _lastCoverPosition = _vm.CoverPosition;
+            ApplyCoverLayout();
+        }
         else if (e.PropertyName == nameof(OverlayViewModel.CoverSizePct))
+        {
+            if (Math.Abs(_vm.CoverSizePct - _lastCoverSizePct) < 0.5)
+                return;
+            _lastCoverSizePct = _vm.CoverSizePct;
             UpdateCoverSize();
+        }
         else if (e.PropertyName is nameof(OverlayViewModel.StrokeEnabled)
                  or nameof(OverlayViewModel.StrokeThickness))
             ApplyStroke();
@@ -263,6 +285,7 @@ public sealed partial class LyricsOverlayWindow : Window
         ApplyCoverLayout();
         UpdateCoverSize();
         var animate = _vm.CoverCutAnimation && _vm.ConsumeCutAnimationFlag();
+        Log.Info($"cover: track={_vm.CoverTrackKey} image={( _vm.CoverImage != null)} animate={animate} enabled={_vm.CoverEnabled}");
 
         if (_vm.CoverImage == null)
         {
@@ -283,6 +306,7 @@ public sealed partial class LyricsOverlayWindow : Window
             Cover.RenderTransform = new TranslateTransform(CenterOffsetX(), CenterOffsetY());
             Cover.Opacity = 1;
             _coverStageTimer.Start();
+            Log.Info($"cover: animation started, center=({CenterOffsetX():F0},{CenterOffsetY():F0})");
             return;
         }
 
@@ -342,6 +366,8 @@ public sealed partial class LyricsOverlayWindow : Window
     /// </summary>
     private void UpdateCoverSize()
     {
+        if (_coverAnimating)
+            return; // 动画期间冻结尺寸，避免布局波动打断动画/引起抖动
         var baseH = _mainGrid.Bounds.Height;
         if (baseH <= 0)
             baseH = 40;

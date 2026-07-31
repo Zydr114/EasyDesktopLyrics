@@ -19,7 +19,7 @@ public sealed class OverlayViewModel : ObservableObject
         nameof(WindowVisible), nameof(IsPlaying),
         nameof(StrokeEnabled), nameof(StrokeBrush), nameof(StrokeThickness), nameof(LineSpacing),
         nameof(TextAlignment), nameof(GlowEnabled),
-        nameof(CoverImage), nameof(CoverTrackKey), nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverPosition), nameof(CoverSizePct),
+        nameof(CoverImage), nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverPosition), nameof(CoverSizePct),
     ];
 
     private readonly SettingsService _settings;
