@@ -36,6 +36,7 @@ public sealed partial class LyricsOverlayWindow : Window
     private bool _coverAnimating;
     private double _coverAnimSize;
     private double _animWindowWidth;
+    private DateTimeOffset _coverAnimStart;
     private bool _lastCoverEnabled;
     private double _lastCoverSizePct;
 
@@ -331,6 +332,8 @@ public sealed partial class LyricsOverlayWindow : Window
             _coverTimeoutTimer.Stop();
             SetLyricsOpacity(0);
             _coverAnimSize = AnimCoverSize();
+            _coverAnimStart = DateTimeOffset.UtcNow;
+            _coverTimeoutTimer.Interval = TimeSpan.FromMilliseconds(_vm.CoverAnimMaxMs);
 
             // 窗口宽度锁定不变（封面水平居中于歌词行位置），高度撑到封面高；
             // 布局稳定后封面从顶边滑入（避免窗口跳变暴露）
@@ -369,6 +372,8 @@ public sealed partial class LyricsOverlayWindow : Window
     /// <summary>布局稳定后封面从顶边滑入（水平居中于窗口 = 歌词行中心）。</summary>
     private async Task ShowCoverAfterLayoutAsync()
     {
+        // 布局在 Render 阶段执行，Normal 回调时尚未完成：连续两次确保布局已跑
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Normal);
         await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Normal);
         if (!_coverAnimating)
             return;
@@ -380,14 +385,16 @@ public sealed partial class LyricsOverlayWindow : Window
         _coverTimeoutTimer.Start();
     }
 
-    /// <summary>歌词加载完成（Ready/NoLyric）→ 动画进入结束阶段；超时强制结束。</summary>
+    /// <summary>歌词加载完成（Ready/NoLyric）→ 动画进入结束阶段；未达到最短时长则等待补齐。</summary>
     private void OnLyricsPhaseChanged()
     {
         if (!_coverAnimating)
             return;
         if (_vm.Phase is LyricsPhase.Ready or LyricsPhase.NoLyric)
         {
-            _coverStageTimer.Interval = TimeSpan.FromMilliseconds(400);
+            var elapsed = (DateTimeOffset.UtcNow - _coverAnimStart).TotalMilliseconds;
+            var wait = Math.Max(400, _vm.CoverAnimMinMs - elapsed);
+            _coverStageTimer.Interval = TimeSpan.FromMilliseconds(wait);
             _coverStageTimer.Start();
         }
     }
@@ -416,7 +423,8 @@ public sealed partial class LyricsOverlayWindow : Window
         }
         else
         {
-            // 分支 B：封面原地（中心）淡出，恢复窗口布局
+            // 分支 B：封面原地淡出（不缩放、不移动），恢复窗口布局
+            Cover.Opacity = 0;
             LyricsArea.IsVisible = true;
             LyricsArea.MinWidth = _vm.MaxTextWidth;
             CoverSlot.Width = 0;
@@ -424,11 +432,11 @@ public sealed partial class LyricsOverlayWindow : Window
             RightPad.Width = 0;
             RightPad.Height = 0;
             MinWidth = 0;
-            CoverImage.Width = _coverSize;
-            CoverImage.Height = _coverSize;
-            Cover.Opacity = 0;
             SetLyricsOpacity(1);
             _coverAnimating = false;
+            // 淡出完成后恢复常驻尺寸（不可见状态下设置，无动画干扰）
+            CoverImage.Width = _coverSize;
+            CoverImage.Height = _coverSize;
         }
     }
 

@@ -85,6 +85,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         nameof(ShowTranslation), nameof(HideWhenPaused), nameof(ShowTitleWhenNoLyric), nameof(AutoStartEnabled),
         nameof(LyricsFolder), nameof(GlobalOffsetMs),
         nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverSizePctVal),
+        nameof(CoverAnimMinSec), nameof(CoverAnimMaxSec),
         nameof(SelectedPresetIndex), nameof(PositionXPct), nameof(PositionYPct),        nameof(AlignmentIndex), nameof(SelectedFontFamily),
     ];
 
@@ -721,6 +722,30 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
             var v = Math.Round(value);
             if (Math.Abs(v - _settings.Current.CoverSizePct) < 1) return;
             _settings.Update(s => s.CoverSizePct = v);
+        }
+    }
+
+    /// <summary>切歌封面最短显示时长（秒）。</summary>
+    public double CoverAnimMinSec
+    {
+        get => _settings.Current.CoverAnimMinMs / 1000.0;
+        set
+        {
+            var ms = (int)Math.Round(value * 1000);
+            if (ms == _settings.Current.CoverAnimMinMs) return;
+            _settings.Update(s => s.CoverAnimMinMs = ms);
+        }
+    }
+
+    /// <summary>切歌封面最长显示时长（秒）。</summary>
+    public double CoverAnimMaxSec
+    {
+        get => _settings.Current.CoverAnimMaxMs / 1000.0;
+        set
+        {
+            var ms = (int)Math.Round(value * 1000);
+            if (ms == _settings.Current.CoverAnimMaxMs) return;
+            _settings.Update(s => s.CoverAnimMaxMs = ms);
         }
     }
 

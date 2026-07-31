@@ -70,6 +70,12 @@ public sealed class OverlayViewModel : ObservableObject
 
     public bool CoverCutAnimation => S.CoverCutAnimation;
 
+    /// <summary>切歌封面最短显示时长（ms）。</summary>
+    public int CoverAnimMinMs => Math.Clamp(S.CoverAnimMinMs, 300, 5000);
+
+    /// <summary>切歌封面最长显示时长（ms）。</summary>
+    public int CoverAnimMaxMs => Math.Clamp(S.CoverAnimMaxMs, 1000, 15000);
+
     /// <summary>封面占比：封面边长 = 歌词行高度 × 该百分比（40–120）。</summary>
     public double CoverSizePct => Math.Clamp(S.CoverSizePct, 40, 120);
 

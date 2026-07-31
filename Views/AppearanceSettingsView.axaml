@@ -147,7 +147,7 @@
           <TextBlock Classes="cardDesc"
                      Text="点击播放控制条中的上一首/下一首时，封面平滑淡入居中展示，之后移动到常驻位置（若开启常驻）或淡出。封面为正方形，边长不超过歌词行高度的 120%。" />
         </StackPanel>
-        <Grid ColumnDefinitions="110,*,Auto" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto" RowSpacing="8">
+        <Grid ColumnDefinitions="110,*,Auto" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
           <TextBlock Classes="sectionLabel" Text="常驻显示" />
           <ToggleSwitch Grid.Column="1" IsChecked="{Binding CoverEnabled, Mode=TwoWay}" />
           <TextBlock Classes="sectionLabel" Text="切歌动画" Grid.Row="1" />
@@ -156,6 +156,16 @@
           <Slider Grid.Column="1" Grid.Row="2" Minimum="40" Maximum="120" TickFrequency="5"
                   Value="{Binding CoverSizePctVal, Mode=TwoWay}" />
           <TextBlock Grid.Column="2" Grid.Row="2" Text="{Binding CoverSizePctVal, StringFormat='{}{0:F0}%'}"
+                     VerticalAlignment="Center" TextAlignment="Right" FontSize="12" Width="44" />
+          <TextBlock Classes="sectionLabel" Text="最短显示" Grid.Row="3" />
+          <Slider Grid.Column="1" Grid.Row="3" Minimum="0.3" Maximum="5" TickFrequency="0.1"
+                  Value="{Binding CoverAnimMinSec, Mode=TwoWay}" />
+          <TextBlock Grid.Column="2" Grid.Row="3" Text="{Binding CoverAnimMinSec, StringFormat='{}{0:F1}s'}"
+                     VerticalAlignment="Center" TextAlignment="Right" FontSize="12" Width="44" />
+          <TextBlock Classes="sectionLabel" Text="最长显示" Grid.Row="4" />
+          <Slider Grid.Column="1" Grid.Row="4" Minimum="1" Maximum="15" TickFrequency="0.5"
+                  Value="{Binding CoverAnimMaxSec, Mode=TwoWay}" />
+          <TextBlock Grid.Column="2" Grid.Row="4" Text="{Binding CoverAnimMaxSec, StringFormat='{}{0:F1}s'}"
                      VerticalAlignment="Center" TextAlignment="Right" FontSize="12" Width="44" />
         </Grid>
       </StackPanel>

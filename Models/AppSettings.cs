@@ -52,6 +52,10 @@ public sealed class AppSettings
     public string CoverPosition { get; set; } = "left";
     /// <summary>封面占比：封面尺寸 = 歌词宽度 × 该百分比（40–120）。</summary>
     public double CoverSizePct { get; set; } = 80;
+    /// <summary>切歌封面最短显示时长（ms，歌词提前加载完成时保底）。</summary>
+    public int CoverAnimMinMs { get; set; } = 1200;
+    /// <summary>切歌封面最长显示时长（ms，歌词加载超时时强制结束）。</summary>
+    public int CoverAnimMaxMs { get; set; } = 6000;
 
     // ---- SMTC ----
     /// <summary>锁定监听的播放器 AUMID；null/空 = 自动跟随系统当前会话。</summary>
