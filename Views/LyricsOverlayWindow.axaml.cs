@@ -53,7 +53,7 @@ public sealed partial class LyricsOverlayWindow : Window
         _topmostTimer.Tick += (_, _) => Win32.AssertTopmost(_hwnd);
         _topmostTimer.Start();
 
-        _hideControlsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
+        _hideControlsTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         _hideControlsTimer.Tick += (_, _) =>
         {
             _hideControlsTimer.Stop();
@@ -67,9 +67,10 @@ public sealed partial class LyricsOverlayWindow : Window
         SizeChanged += OnSizeChanged;
     }
 
-    /// <summary>hover 显示播放控制条；移出 600ms 后隐藏。</summary>
+    /// <summary>hover 显示播放控制条（歌词下方展开）；移出 200ms 后收起。</summary>
     private void SetControlsVisible(bool visible)
     {
+        ControlBar.Height = visible ? 34 : 0;
         ControlBar.Opacity = visible ? 1 : 0;
         ControlBar.IsHitTestVisible = visible;
     }

@@ -13,43 +13,45 @@
         SizeToContent="WidthAndHeight">
 
   <Border CornerRadius="6" Padding="12,6">
-    <Grid>
+    <Grid RowDefinitions="Auto,Auto">
       <!-- 歌词主体 -->
-      <Viewbox MaxWidth="{Binding MaxTextWidth}"
+      <Viewbox Grid.Row="0" MaxWidth="{Binding MaxTextWidth}"
                StretchDirection="DownOnly">
         <StackPanel x:Name="RootPanel" Spacing="{Binding LineSpacing}">
           <!-- 内容由代码后置动态构建，支持描边/辉光层切换 -->
         </StackPanel>
       </Viewbox>
 
-      <!-- 播放控制条：hover 显示，叠加层（不改变窗口尺寸） -->
-      <Border x:Name="ControlBar"
-              VerticalAlignment="Bottom" HorizontalAlignment="Center"
-              Background="{DynamicResource SystemChromeMediumLowColor}"
-              CornerRadius="14" Padding="6,3" Margin="0,0,0,4"
-              Opacity="0" IsHitTestVisible="False">
+      <!-- 播放控制条：hover 显示，位于歌词下方（高度动画展开） -->
+      <Border x:Name="ControlBar" Grid.Row="1"
+              Height="0" Opacity="0" IsHitTestVisible="False" ClipToBounds="True">
         <Border.Transitions>
           <Transitions>
+            <DoubleTransition Property="Height" Duration="0:0:0.15" />
             <DoubleTransition Property="Opacity" Duration="0:0:0.15" />
           </Transitions>
         </Border.Transitions>
-        <StackPanel Orientation="Horizontal" Spacing="2">
-          <Button Command="{Binding PrevCommand}" Background="Transparent" BorderThickness="0"
-                  Padding="9,4" CornerRadius="10" HorizontalContentAlignment="Center">
-            <TextBlock Text="&#xE74A;" FontFamily="Segoe Fluent Icons,Segoe MDL2 Assets"
-                       FontSize="13" />
-          </Button>
-          <Button Command="{Binding PlayPauseCommand}" Background="Transparent" BorderThickness="0"
-                  Padding="9,4" CornerRadius="10" HorizontalContentAlignment="Center">
-            <TextBlock x:Name="PlayPauseIcon" Text="&#xE769;"
-                       FontFamily="Segoe Fluent Icons,Segoe MDL2 Assets" FontSize="13" />
-          </Button>
-          <Button Command="{Binding NextCommand}" Background="Transparent" BorderThickness="0"
-                  Padding="9,4" CornerRadius="10" HorizontalContentAlignment="Center">
-            <TextBlock Text="&#xE74B;" FontFamily="Segoe Fluent Icons,Segoe MDL2 Assets"
-                       FontSize="13" />
-          </Button>
-        </StackPanel>
+        <Border Margin="0,4,0,0" Height="30" HorizontalAlignment="Center"
+                Background="{DynamicResource SystemChromeMediumLowColor}"
+                CornerRadius="14" Padding="6,2">
+          <StackPanel Orientation="Horizontal" Spacing="2">
+            <Button Command="{Binding PrevCommand}" Background="Transparent" BorderThickness="0"
+                    Padding="10,3" CornerRadius="10" HorizontalContentAlignment="Center">
+              <TextBlock Text="&#xE74A;" FontFamily="Segoe Fluent Icons,Segoe MDL2 Assets"
+                         FontSize="13" />
+            </Button>
+            <Button Command="{Binding PlayPauseCommand}" Background="Transparent" BorderThickness="0"
+                    Padding="10,3" CornerRadius="10" HorizontalContentAlignment="Center">
+              <TextBlock x:Name="PlayPauseIcon" Text="&#xE769;"
+                         FontFamily="Segoe Fluent Icons,Segoe MDL2 Assets" FontSize="13" />
+            </Button>
+            <Button Command="{Binding NextCommand}" Background="Transparent" BorderThickness="0"
+                    Padding="10,3" CornerRadius="10" HorizontalContentAlignment="Center">
+              <TextBlock Text="&#xE74B;" FontFamily="Segoe Fluent Icons,Segoe MDL2 Assets"
+                         FontSize="13" />
+            </Button>
+          </StackPanel>
+        </Border>
       </Border>
     </Grid>
   </Border>
