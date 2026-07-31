@@ -84,7 +84,7 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         nameof(TransFontSizeVal), nameof(LineSpacingVal), nameof(TextOpacity), nameof(MaxWidth),
         nameof(ShowTranslation), nameof(HideWhenPaused), nameof(ShowTitleWhenNoLyric), nameof(AutoStartEnabled),
         nameof(LyricsFolder), nameof(GlobalOffsetMs),
-        nameof(CoverModeIndex), nameof(CoverPositionIndex), nameof(CoverSizeVal),
+        nameof(CoverEnabled), nameof(CoverPositionIndex), nameof(CoverSizePctVal),
         nameof(SelectedPresetIndex), nameof(PositionXPct), nameof(PositionYPct),        nameof(AlignmentIndex), nameof(SelectedFontFamily),
     ];
 
@@ -693,20 +693,17 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
     }
 
     // ---------- 封面 ----------
-    public IReadOnlyList<string> CoverModeOptions { get; } = ["关闭", "切歌提示", "常驻显示"];
-
     public IReadOnlyList<string> CoverPositionOptions { get; } = ["歌词左侧", "歌词右侧"];
 
-    private static readonly string[] CoverModeValues = ["off", "transient", "always"];
     private static readonly string[] CoverPositionValues = ["left", "right"];
 
-    public int CoverModeIndex
+    public bool CoverEnabled
     {
-        get => Math.Clamp(Array.IndexOf(CoverModeValues, _settings.Current.CoverMode), 0, 2);
+        get => _settings.Current.CoverEnabled;
         set
         {
-            if (value < 0 || value > 2 || CoverModeValues[value] == _settings.Current.CoverMode) return;
-            _settings.Update(s => s.CoverMode = CoverModeValues[value]);
+            if (value == _settings.Current.CoverEnabled) return;
+            _settings.Update(s => s.CoverEnabled = value);
         }
     }
 
@@ -720,14 +717,14 @@ public sealed class SettingsViewModel : ObservableObject, IDisposable
         }
     }
 
-    public double CoverSizeVal
+    public double CoverSizePctVal
     {
-        get => _settings.Current.CoverSize;
+        get => _settings.Current.CoverSizePct;
         set
         {
             var v = Math.Round(value);
-            if (Math.Abs(v - _settings.Current.CoverSize) < 1) return;
-            _settings.Update(s => s.CoverSize = v);
+            if (Math.Abs(v - _settings.Current.CoverSizePct) < 1) return;
+            _settings.Update(s => s.CoverSizePct = v);
         }
     }
 

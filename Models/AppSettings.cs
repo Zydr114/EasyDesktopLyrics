@@ -44,12 +44,12 @@ public sealed class AppSettings
     public bool LyricsVisible { get; set; } = true;
 
     // ---- 封面 ----
-    /// <summary>封面显示："off" / "transient"（切歌提示）/ "always"（常驻）。</summary>
-    public string CoverMode { get; set; } = "off";
+    /// <summary>播放时常驻显示封面。</summary>
+    public bool CoverEnabled { get; set; }
     /// <summary>封面位置："left" / "right"。</summary>
     public string CoverPosition { get; set; } = "left";
-    /// <summary>封面尺寸（DIP）。</summary>
-    public double CoverSize { get; set; } = 120;
+    /// <summary>封面占比：封面尺寸 = 歌词宽度 × 该百分比（40–120）。</summary>
+    public double CoverSizePct { get; set; } = 80;
 
     // ---- SMTC ----
     /// <summary>锁定监听的播放器 AUMID；null/空 = 自动跟随系统当前会话。</summary>
