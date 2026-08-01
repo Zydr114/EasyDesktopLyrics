@@ -15,3 +15,6 @@ PublishProfiles/
 
 ## Ignore local release packages
 release/
+
+## Ignore test logs from testers
+log/

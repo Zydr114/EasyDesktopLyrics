@@ -10,7 +10,7 @@
         ShowInTaskbar="False"
         ShowActivated="False"
         CanResize="False"
-        SizeToContent="WidthAndHeight">
+        SizeToContent="Width">
 
   <Border CornerRadius="6" Padding="12,6">
     <Grid x:Name="OuterGrid" RowDefinitions="Auto,Auto">

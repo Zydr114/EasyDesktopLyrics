@@ -37,13 +37,9 @@ public sealed partial class LyricsOverlayWindow : Window
     private bool _dragStarted;
     private bool _coverAnimating;
     private double _coverAnimSize;
-    private double _animWindowWidth;
     private DateTimeOffset _coverAnimStart;
-    private bool _coverPendingLayout;
-    private int _layoutPasses;
-    private bool _pendingAnimStart;
-    private bool _pendingPersistent;
-    private readonly DispatcherTimer _layoutWaitTimer;
+    private bool _firstSizeApplied;
+    private int _lastGrowBottom;
     private bool _lastCoverEnabled;
     private double _lastCoverSizePct;
 
@@ -99,20 +95,12 @@ public sealed partial class LyricsOverlayWindow : Window
         _coverTimeoutTimer = new DispatcherTimer { Interval = CoverAnimTimeout };
         _coverTimeoutTimer.Tick += (_, _) => OnCoverStage();
 
-        // 布局等待兜底：两轮 LayoutUpdated 未完成时强制继续（封面位置用已知宽度，仍正确）
-        _layoutWaitTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(800) };
-        _layoutWaitTimer.Tick += (_, _) => CompleteCoverLayout();
-        LayoutUpdated += (_, _) =>
-        {
-            if (!_coverPendingLayout)
-                return;
-            if (_layoutPasses++ == 0)
-                return; // 第一轮布局后窗口可能再调整，两轮确认
-            CompleteCoverLayout();
-        };
-
         PointerEntered += (_, _) => { _hideControlsTimer.Stop(); SetControlsVisible(true); };
         PointerExited += (_, _) => _hideControlsTimer.Start();
+
+        // 窗口高度显式管理：Avalonia 的 SizeToContent 高度跟随在高分屏环境不可靠
+        // （窗口高度不随内容增长 → 封面/胶囊被窗口边缘截断），宽度仍由 SizeToContent 自动。
+        LayoutUpdated += (_, _) => SyncWindowHeight();
 
         _lastCoverEnabled = _vm.CoverEnabled;
         _lastCoverSizePct = _vm.CoverSizePct;
@@ -133,6 +121,29 @@ public sealed partial class LyricsOverlayWindow : Window
         ControlBar.Height = visible ? 34 : 0;
         ControlBar.Opacity = visible ? 1 : 0;
         ControlBar.IsHitTestVisible = visible;
+    }
+
+    /// <summary>
+    /// 窗口高度 = 内容布局期望高度（主行 + 翻译行 + spacing + 封面覆盖层 + 控制条 + padding）。
+    /// 各组件 Bounds 均与窗口高度无关（宽度由 SizeToContent 决定，缩放由此确定）→ 收敛无循环。
+    /// </summary>
+    private double ContentHeight()
+    {
+        var h = _mainGrid.Bounds.Height;
+        if (_transGrid.Bounds.Height > 0)
+            h += _transGrid.Bounds.Height + _vm.LineSpacing;
+        h = Math.Max(h, Cover.Bounds.Height);
+        return h + ControlBar.Height + 12; // 12 = Border padding 6×2
+    }
+
+    /// <summary>显式同步窗口高度（差异 > 0.5 才设置，避免抖动/循环）。</summary>
+    private void SyncWindowHeight()
+    {
+        if (!IsVisible || Height <= 0)
+            return;
+        var want = ContentHeight();
+        if (want > 0 && Math.Abs(want - Height) > 0.5)
+            Height = want;
     }
 
     private void UpdatePlayPauseIcon()
@@ -398,17 +409,15 @@ public sealed partial class LyricsOverlayWindow : Window
         return b.Build();
     }
 
-    /// <summary>动画封面尺寸 = 歌词行高度 × 该倍数（掩盖歌词加载，居中于歌词行位置）。</summary>
-    private const double CoverAnimScale = 3.0;
-
     /// <summary>歌词加载完成的等待超时（防封面卡死）。</summary>
     private static readonly TimeSpan CoverAnimTimeout = TimeSpan.FromSeconds(6);
 
     /// <summary>
-    /// 切歌（任意来源：播放器内切歌 / 悬浮窗上一首下一首）动画状态机：
-    /// 封面先于歌词到达 → 封面以行高 300% 显示在歌词行中央（窗口收缩为封面大小，中心=歌词行锚点），
-    /// 掩盖歌词加载 → 歌词 Ready/NoLyric 后（或超时）执行分支：
-    /// 常驻=恢复布局并缩小移动到常驻位 / 不常驻=淡出。动画使用二次缓出。
+    /// 切歌（任意来源：播放器内切歌 / 悬浮窗上一首下一首）动画状态机（方案二：窗口内叠加）：
+    /// 窗口尺寸全程不变（不隐藏歌词、不撑高窗口、不锁定 MinWidth）；
+    /// 封面作为覆盖层放大到行高尺寸显示在歌词行中央（歌词透明被掩盖），
+    /// 歌词 Ready/NoLyric 后（或超时）执行分支：
+    /// 常驻=封面缩小移动到常驻位 / 不常驻=淡出。尺寸与位置均由 Transitions 平滑过渡。
     /// </summary>
     private void OnCoverChanged()
     {
@@ -437,28 +446,15 @@ public sealed partial class LyricsOverlayWindow : Window
             _coverAnimSize = AnimCoverSize();
             _coverAnimStart = DateTimeOffset.UtcNow;
             _coverTimeoutTimer.Interval = TimeSpan.FromMilliseconds(_vm.CoverAnimMaxMs);
+            _coverTimeoutTimer.Start();
 
-            // 窗口宽度锁定不变（封面水平居中于歌词行位置），高度撑到封面高；
-            // 布局稳定后封面从顶边滑入（避免窗口跳变暴露）
-            _animWindowWidth = ClientSize.Width;
-            MinWidth = _animWindowWidth;
-            LyricsArea.IsVisible = false;
-            LyricsArea.MinWidth = 0;
-            CoverSlot.Width = 0;
-            CoverSlot.Height = _coverAnimSize;
-            RightPad.Width = 0;
-            RightPad.Height = 0;
+            // 窗口内叠加：封面放大到行高尺寸、居中于歌词行，淡入掩盖歌词
             CoverImage.Width = _coverAnimSize;
             CoverImage.Height = _coverAnimSize;
-            Cover.Opacity = 0;
-
-            // 布局稳定后（LayoutUpdated 两轮确认）再滑入封面，确保窗口尺寸/位置正确
-            _pendingAnimStart = true;
-            _pendingPersistent = false;
-            _coverPendingLayout = true;
-            _layoutPasses = 0;
-            _layoutWaitTimer.Start();
-            Log.Info($"cover: animation started, winW={_animWindowWidth:F0} size={_coverAnimSize:F0}");
+            var cx = Math.Max(0, (OuterGrid.Bounds.Width - _coverAnimSize) / 2);
+            Cover.RenderTransform = Translate(cx, 0);
+            Cover.Opacity = 1;
+            Log.Info($"cover: animation started, winW={ClientSize.Width:F0} size={_coverAnimSize:F0} cx={cx:F0}");
             return;
         }
 
@@ -469,59 +465,14 @@ public sealed partial class LyricsOverlayWindow : Window
         {
             var target = CoverSlotOffset();
             Cover.RenderTransform = Translate(target.X, target.Y);
+            CoverImage.Width = _coverSize;
+            CoverImage.Height = _coverSize;
             Cover.Opacity = 1;
         }
         else
         {
             Cover.Opacity = 0;
         }
-    }
-
-    /// <summary>
-    /// 布局稳定后封面直接显示在居中位置（淡入；滑入特效暂缓）。
-    /// 封面定位坐标系为 OuterGrid（Border padding 内），必须用其宽度计算居中，
-    /// 否则封面中心相对歌词行中心偏移一个左 padding（日志实证：client 764 vs bounds 740）。
-    /// </summary>
-    private async Task StartCoverSlideInAsync()
-    {
-        if (!_coverAnimating)
-            return;
-
-        var cx = Math.Max(0, (OuterGrid.Bounds.Width - _coverAnimSize) / 2);
-        Log.Info($"cover: show at cx={cx:F0} size={_coverAnimSize:F0} bounds={OuterGrid.Bounds.Width:F0}x{OuterGrid.Bounds.Height:F0}");
-        Cover.RenderTransform = Translate(cx, 0);
-        Cover.Opacity = 1;
-        _coverTimeoutTimer.Start();
-    }
-
-    /// <summary>布局稳定（两轮 LayoutUpdated 或超时兜底）后执行待办：封面滑入 / 常驻淡入。</summary>
-    private void CompleteCoverLayout()
-    {
-        _coverPendingLayout = false;
-        _layoutWaitTimer.Stop();
-        if (_pendingAnimStart)
-        {
-            _pendingAnimStart = false;
-            _ = StartCoverSlideInAsync();
-        }
-        else if (_pendingPersistent)
-        {
-            _pendingPersistent = false;
-            _ = ShowPersistentCoverDelayedAsync();
-        }
-    }
-
-    /// <summary>常驻封面：等封面淡出完成后在常驻位淡入。</summary>
-    private async Task ShowPersistentCoverDelayedAsync()
-    {
-        await Task.Delay(350);
-        if (!_vm.CoverEnabled)
-            return;
-        CoverImage.Width = _coverSize;
-        CoverImage.Height = _coverSize;
-        var target = CoverSlotOffset();
-        Cover.RenderTransform = Translate(target.X, target.Y);
-        Cover.Opacity = 1;
     }
 
     /// <summary>歌词加载完成（Ready/NoLyric）→ 动画进入结束阶段；未达到最短时长则等待补齐。</summary>
@@ -545,53 +496,36 @@ public sealed partial class LyricsOverlayWindow : Window
         if (!_coverAnimating)
             return;
 
+        _coverAnimating = false;
+        SetLyricsOpacity(1);
         if (_vm.CoverEnabled)
         {
-            // 分支 A：封面在中心淡出并恢复窗口布局；常驻封面随后在常驻位淡入（交叉淡化）
-            LyricsArea.IsVisible = true;
-            LyricsArea.MinWidth = _vm.MaxTextWidth;
-            CoverSlot.Width = _coverSize;
-            CoverSlot.Height = _coverSize;
-            RightPad.Width = _coverSize;
-            RightPad.Height = _coverSize;
-            MinWidth = 0;
-            Cover.Opacity = 0;
-            SetLyricsOpacity(1);
-            _coverAnimating = false;
-            _pendingAnimStart = false;
-            _pendingPersistent = true;
-            _coverPendingLayout = true;
-            _layoutPasses = 0;
-            _layoutWaitTimer.Start();
+            // 常驻：封面缩小回常驻尺寸并移动到常驻位（尺寸/位置过渡动画）
+            CoverImage.Width = _coverSize;
+            CoverImage.Height = _coverSize;
+            var target = CoverSlotOffset();
+            Cover.RenderTransform = Translate(target.X, target.Y);
+            Cover.Opacity = 1;
         }
         else
         {
-            // 分支 B：封面原地淡出（不缩放、不移动），恢复窗口布局
+            // 不常驻：封面淡出并恢复常驻尺寸
             Cover.Opacity = 0;
-            LyricsArea.IsVisible = true;
-            LyricsArea.MinWidth = _vm.MaxTextWidth;
-            CoverSlot.Width = 0;
-            CoverSlot.Height = 0;
-            RightPad.Width = 0;
-            RightPad.Height = 0;
-            MinWidth = 0;
-            SetLyricsOpacity(1);
-            _coverAnimating = false;
-            // 淡出完成后恢复常驻尺寸（不可见状态下设置，无动画干扰）
             CoverImage.Width = _coverSize;
             CoverImage.Height = _coverSize;
+            Cover.RenderTransform = Translate(0, 0);
         }
     }
 
     private void SetLyricsOpacity(double opacity) => LyricsViewbox.Opacity = opacity;
 
-    /// <summary>动画封面尺寸：歌词行高度 × 300%（兜底 40px）。</summary>
+    /// <summary>动画封面尺寸 = 行高 × 300%（掩盖歌词加载的大封面；窗口高度由 ContentHeight 自动容纳）。</summary>
     private double AnimCoverSize()
     {
         var h = _mainGrid.Bounds.Height;
         if (h <= 0)
             h = 40;
-        return h * CoverAnimScale;
+        return Math.Max(h * 3, _coverSize);
     }
 
     /// <summary>常驻位置（CoverSlot 左上角）在外层 Grid 内的坐标（与封面元素同一坐标系）。</summary>
@@ -692,14 +626,36 @@ public sealed partial class LyricsOverlayWindow : Window
         _hideControlsTimer.Stop();
         _coverStageTimer.Stop();
         _coverTimeoutTimer.Stop();
-        _layoutWaitTimer.Stop();
         base.OnClosed(e);
     }
 
     private void OnSizeChanged(object? sender, SizeChangedEventArgs e)
     {
         if (!_suppressPositionUpdate && ClientSize.Width > 0 && ClientSize.Height > 0)
-            RepositionToAnchor();
+        {
+            var grow = _settingsService.Current.HeightGrowMode;
+            if (_firstSizeApplied && e.HeightChanged && !e.WidthChanged && grow != 0)
+            {
+                // 纯高度变化（胶囊展开/封面动画/字体变化）：
+                // 1=向下扩展（顶部固定，Position 不变）；2=向上扩展（底部固定，顶部上移）
+                if (grow == 2)
+                {
+                    var s = Screens.ScreenFromWindow(this)?.Scaling ?? 1.0;
+                    _suppressPositionUpdate = true;
+                    Position = new PixelPoint(Position.X, (int)(_lastGrowBottom - ClientSize.Height * s));
+                    _suppressPositionUpdate = false;
+                }
+            }
+            else
+            {
+                RepositionToAnchor();
+                if (e.WidthChanged || !_firstSizeApplied)
+                    _firstSizeApplied = true;
+            }
+        }
+        // 记录当前窗口底边（物理像素），供"向上扩展"模式使用
+        var scale = Screens.ScreenFromWindow(this)?.Scaling ?? 1.0;
+        _lastGrowBottom = Position.Y + (int)Math.Round(ClientSize.Height * scale);
         LogSizeDiagnostics();
     }
 

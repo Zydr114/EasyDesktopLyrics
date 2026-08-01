@@ -192,6 +192,15 @@ public sealed partial class SettingsViewModel
         }
     }
 
+    /// <summary>窗口高度扩展方向选项：索引 0=向下、1=向上、2=上下均扩展。</summary>
+    public IReadOnlyList<string> HeightGrowOptions { get; } = ["向下扩展", "向上扩展", "上下均扩展"];
+
+    public int HeightGrowIndex
+    {
+        get => _settings.Current.HeightGrowMode switch { 1 => 0, 2 => 1, _ => 2 };
+        set => _settings.Update(s => s.HeightGrowMode = value switch { 0 => 1, 1 => 2, _ => 0 });
+    }
+
     public double CoverSizePctVal
     {
         get => _settings.Current.CoverSizePct;

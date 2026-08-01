@@ -92,6 +92,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverSizePctVal),
         nameof(CoverAnimMinSec), nameof(CoverAnimMaxSec),
         nameof(SelectedPresetIndex), nameof(PositionXPct), nameof(PositionYPct), nameof(AlignmentIndex), nameof(SelectedFontFamily),
+        nameof(HeightGrowIndex),
     ];
 
     private readonly SettingsService _settings;

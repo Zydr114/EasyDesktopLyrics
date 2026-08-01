@@ -46,6 +46,8 @@ public sealed class AppSettings
     /// <summary>窗口中心锚点（虚拟桌面物理像素坐标）；null = 主屏底部默认位置。</summary>
     public double? AnchorX { get; set; }
     public double? AnchorY { get; set; }
+    /// <summary>窗口高度变化时的扩展方向：1=向下（顶部固定，默认），2=向上（底部固定），0=上下均扩展（中心固定）。</summary>
+    public int HeightGrowMode { get; set; } = 1;
 
     // ---- 行为 ----
     public bool ShowTranslation { get; set; }

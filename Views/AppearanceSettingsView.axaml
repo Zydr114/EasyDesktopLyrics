@@ -312,6 +312,12 @@
                        Text="{Binding PositionYPct, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}%'}"
                        TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
             </Grid>
+            <Grid ColumnDefinitions="50,*,Auto" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="高度扩展" />
+              <ComboBox Grid.Column="1" ItemsSource="{Binding HeightGrowOptions}"
+                        SelectedIndex="{Binding HeightGrowIndex, Mode=TwoWay}" />
+            </Grid>
+            <TextBlock Text="窗口高度变化（胶囊展开/封面动画/翻译行等）时的扩展方向。" FontSize="11" Opacity="0.6" />
           </StackPanel>
         </Grid>
       </StackPanel>
