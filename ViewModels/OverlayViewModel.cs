@@ -15,11 +15,12 @@ public sealed class OverlayViewModel : ObservableObject
     [
         nameof(MainText), nameof(TransText), nameof(ShowTransLine),
         nameof(FontFamilyValue), nameof(MainFontSize), nameof(EffectiveTransFontSize), nameof(WeightValue),
-        nameof(Fill), nameof(TextOpacity), nameof(MaxTextWidth), nameof(TextEffect), nameof(GlowEffect),
+        nameof(Fill), nameof(InactiveFill), nameof(TextOpacity), nameof(MaxTextWidth), nameof(TextEffect), nameof(GlowEffect),
         nameof(WindowVisible), nameof(IsPlaying), nameof(Phase),
         nameof(StrokeEnabled), nameof(StrokeBrush), nameof(StrokeThickness), nameof(LineSpacing),
         nameof(TextAlignment), nameof(GlowEnabled),
         nameof(CoverImage), nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverSizePct),
+        nameof(WordHighlightLength),
     ];
 
     private readonly SettingsService _settings;
@@ -28,6 +29,8 @@ public sealed class OverlayViewModel : ObservableObject
 
     private string _fillHexCache = "";
     private IBrush _fillCache = Brushes.White;
+    private string _inactiveHexCache = "";
+    private IBrush _inactiveFillCache = Brushes.White;
     private string _strokeHexCache = "";
     private IBrush _strokeBrushCache = Brushes.Black;
     private string _shadowKeyCache = "";
@@ -219,6 +222,25 @@ public sealed class OverlayViewModel : ObservableObject
             return _fillCache;
         }
     }
+
+    /// <summary>逐字未唱段颜色：主色降低不透明度（变暗），区分已唱段。</summary>
+    public IBrush InactiveFill
+    {
+        get
+        {
+            if (_inactiveHexCache != S.ColorHex)
+            {
+                _inactiveHexCache = S.ColorHex;
+                _inactiveFillCache = Color.TryParse(S.ColorHex, out var c)
+                    ? new SolidColorBrush(c, 0.45)
+                    : new SolidColorBrush(Colors.White, 0.45);
+            }
+            return _inactiveFillCache;
+        }
+    }
+
+    /// <summary>当前行已唱字符数；-1 = 非逐字模式（整行高亮）。</summary>
+    public int WordHighlightLength => _orchestrator.CurrentWordDone;
 
     public double TextOpacity => Math.Clamp(S.Opacity, 0.05, 1.0);
 

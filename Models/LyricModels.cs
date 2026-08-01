@@ -1,7 +1,10 @@
 namespace EasyDesktopLyrics.Models;
 
-/// <summary>一行歌词（毫秒时间戳 + 原文 + 可选翻译）。</summary>
-public sealed record LyricLine(long TimeMs, string Text, string? Translation);
+/// <summary>一个逐字（卡拉 OK）歌词字：从该时间戳起演唱该字。</summary>
+public sealed record LyricWord(long TimeMs, string Text);
+
+/// <summary>一行歌词（毫秒时间戳 + 原文 + 可选翻译 + 可选逐字序列）。</summary>
+public sealed record LyricLine(long TimeMs, string Text, string? Translation, IReadOnlyList<LyricWord>? Words = null);
 
 /// <summary>解析后的整首歌词，行按时间升序。</summary>
 public sealed class LyricDocument
@@ -27,8 +30,8 @@ public sealed record ProviderSong(
     string Album,
     long DurationMs);
 
-/// <summary>歌词源返回的原始 LRC 文本。</summary>
-public sealed record RawLyric(string Lrc, string? TranslationLrc);
+/// <summary>歌词源返回的原始 LRC 文本（WordLrc = 逐字歌词原文，如网易 yrc）。</summary>
+public sealed record RawLyric(string Lrc, string? TranslationLrc, string? WordLrc = null);
 
 /// <summary>磁盘缓存条目（正缓存或“未找到”负缓存）。</summary>
 public sealed class CachedLyric
@@ -37,6 +40,7 @@ public sealed class CachedLyric
     public string? SongId { get; set; }
     public string? Lrc { get; set; }
     public string? TransLrc { get; set; }
+    public string? WordLrc { get; set; }
     public bool NotFound { get; set; }
     public DateTimeOffset FetchedAt { get; set; }
 
@@ -46,6 +50,7 @@ public sealed class CachedLyric
         SongId = songId,
         Lrc = raw.Lrc,
         TransLrc = raw.TranslationLrc,
+        WordLrc = raw.WordLrc,
         FetchedAt = DateTimeOffset.UtcNow,
     };
 

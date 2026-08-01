@@ -43,6 +43,8 @@ public sealed partial class LyricsOrchestrator
     private int _lineIndex = -1;
     private int _songOffsetMs;
     private bool _instrumentalEnded;
+    private bool _hasWords;
+    private int _currentWordDone = -1;
 
     public LyricsOrchestrator(
         SmtcService smtc,
@@ -79,6 +81,9 @@ public sealed partial class LyricsOrchestrator
     /// <summary>纯音乐元信息行已显示完毕（时间超过最后一行 5 秒）→ 切回标题。</summary>
     public bool InstrumentalEnded => _instrumentalEnded;
 
+    /// <summary>当前行已唱字符数；-1 = 非逐字模式（整行高亮）。</summary>
+    public int CurrentWordDone => _currentWordDone;
+
     /// <summary>任何展示相关状态变化（相位/当前行/播放状态）。UI 线程回调。</summary>
     public event Action? StateChanged;
 
@@ -93,7 +98,9 @@ public sealed partial class LyricsOrchestrator
         _cts = cts;
         Phase = LyricsPhase.Resolving;
         _doc = null;
+        _hasWords = false;
         _lineIndex = -1;
+        _currentWordDone = -1;
         CurrentMain = "";
         CurrentTrans = "";
         UpdateTimer();
@@ -117,8 +124,10 @@ public sealed partial class LyricsOrchestrator
         _cts = null;
         Track = t;
         _doc = null;
+        _hasWords = false;
         _lineIndex = -1;
         _songOffsetMs = 0;
+        _currentWordDone = -1;
         CurrentMain = "";
         CurrentTrans = "";
         _clock.Reset();
@@ -177,12 +186,14 @@ public sealed partial class LyricsOrchestrator
             if (ct.IsCancellationRequested || !ReferenceEquals(Track, t))
                 return;
             _doc = doc;
+            _hasWords = doc?.Lines.Any(l => l.Words is { Count: > 0 }) == true;
             _songOffsetMs = songOffset;
             _lineIndex = -1;
+            _currentWordDone = -1;
             CurrentMain = "";
             CurrentTrans = "";
             Phase = doc != null ? LyricsPhase.Ready : LyricsPhase.NoLyric;
-            Log.Info($"lyric {(doc != null ? $"ready ({doc.Lines.Count} lines)" : "not found")}: {t.Title}");
+            Log.Info($"lyric {(doc != null ? $"ready ({doc.Lines.Count} lines, words={_hasWords})" : "not found")}: {t.Title}");
             UpdateTimer();
             Tick(forceRaise: true);
             Raise();
@@ -212,7 +223,7 @@ public sealed partial class LyricsOrchestrator
                     }
                     else
                     {
-                        var cachedDoc = ParseLyric(cached.Lrc, cached.TransLrc);
+                        var cachedDoc = ParseLyric(cached.Lrc, cached.TransLrc, cached.WordLrc);
                         if (cachedDoc != null)
                             return (cachedDoc, songOffset);
                     }
@@ -227,7 +238,7 @@ public sealed partial class LyricsOrchestrator
             if (provider != null)
             {
                 var raw = await SafeGetLyricAsync(provider, ov.SongId, ct).ConfigureAwait(false);
-                var doc = raw != null ? ParseLyric(raw.Lrc, raw.TranslationLrc) : null;
+                var doc = raw != null ? ParseLyric(raw.Lrc, raw.TranslationLrc, raw.WordLrc) : null;
                 if (doc != null && raw != null)
                 {
                     await _cache.SetAsync(key, CachedLyric.Positive(provider.Id, ov.SongId, raw)).ConfigureAwait(false);
@@ -276,7 +287,7 @@ public sealed partial class LyricsOrchestrator
             var raw = await SafeGetLyricAsync(c.Provider, c.Song.SongId, ct).ConfigureAwait(false);
             if (raw == null)
                 continue;
-            var doc = ParseLyric(raw.Lrc, raw.TranslationLrc);
+            var doc = ParseLyric(raw.Lrc, raw.TranslationLrc, raw.WordLrc);
             if (doc == null)
                 continue;
 
@@ -290,15 +301,18 @@ public sealed partial class LyricsOrchestrator
     }
 
     /// <summary>
-    /// 解析 LRC。纯音乐判定：排除元信息行后，无内容或全部为纯音乐占位字样。
+    /// 解析 LRC（可选逐字 klyric 合并）。纯音乐判定：排除元信息行后，无内容或全部为纯音乐占位字样。
     /// 纯音乐且存在元信息行（作词/作曲等）→ 保留元信息行短暂显示，之后切回标题；
     /// 否则返回 null（直接显示标题）。
     /// </summary>
-    private static LyricDocument? ParseLyric(string? lrc, string? transLrc)
+    private static LyricDocument? ParseLyric(string? lrc, string? transLrc, string? wordLrc)
     {
         var doc = LrcParser.Parse(lrc, transLrc);
         if (doc == null)
             return null;
+
+        if (!string.IsNullOrWhiteSpace(wordLrc))
+            doc = MergeWordLines(doc, LrcParser.ParseWordLines(wordLrc));
 
         var texts = doc.Lines.Select(l => l.Text).Where(t => t.Length > 0).ToList();
         if (texts.Count == 0)
@@ -315,6 +329,42 @@ public sealed partial class LyricsOrchestrator
         return meta.Count > 0
             ? new LyricDocument(meta, isInstrumental: true)
             : null;
+    }
+
+    /// <summary>
+    /// 逐字补充层合并：klyric 按时间（±800ms 内取最近）挂到主歌词行；
+    /// 匹配率 ≥60% 才视为整首有效（否则整体回退整行高亮）。
+    /// </summary>
+    private static LyricDocument MergeWordLines(
+        LyricDocument doc, IReadOnlyList<(long TimeMs, IReadOnlyList<LyricWord> Words)> wordLines)
+    {
+        if (wordLines.Count == 0)
+            return doc;
+
+        var lines = doc.Lines.ToList();
+        var matched = 0;
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var l = lines[i];
+            long bestDelta = long.MaxValue;
+            IReadOnlyList<LyricWord>? best = null;
+            foreach (var wl in wordLines)
+            {
+                var d = Math.Abs(wl.TimeMs - l.TimeMs);
+                if (d >= bestDelta)
+                    continue;
+                bestDelta = d;
+                best = wl.Words;
+            }
+            if (best != null && bestDelta < 800)
+            {
+                lines[i] = l with { Words = best };
+                matched++;
+            }
+        }
+        return matched * 10 >= lines.Count * 6
+            ? new LyricDocument(lines, doc.IsInstrumental)
+            : doc;
     }
 
     private static async Task<RawLyric?> SafeGetLyricAsync(ILyricsProvider provider, string songId, CancellationToken ct)
@@ -350,13 +400,21 @@ public sealed partial class LyricsOrchestrator
         return list;
     }
 
+    /// <summary>逐字模式：设置开启且当前歌词含逐字数据。</summary>
+    private bool WordMode => _settings.Current.WordByWord && _hasWords;
+
     private void UpdateTimer()
     {
         var shouldRun = Phase == LyricsPhase.Ready && _clock.IsPlaying;
         if (shouldRun && !_timer.IsEnabled)
+        {
+            _timer.Interval = WordMode ? TimeSpan.FromMilliseconds(50) : TimeSpan.FromMilliseconds(100);
             _timer.Start();
+        }
         else if (!shouldRun && _timer.IsEnabled)
+        {
             _timer.Stop();
+        }
     }
 
     private void Tick(bool forceRaise)
@@ -371,14 +429,33 @@ public sealed partial class LyricsOrchestrator
         var ended = _doc.IsInstrumental && _doc.Lines.Count > 0
                     && pos > _doc.Lines[^1].TimeMs + 5000;
 
-        if (idx == _lineIndex && ended == _instrumentalEnded && !forceRaise)
+        var done = WordMode && idx >= 0 ? CountDoneChars(_doc.Lines[idx], pos) : -1;
+
+        if (idx == _lineIndex && ended == _instrumentalEnded && done == _currentWordDone && !forceRaise)
             return;
 
         _lineIndex = idx;
         _instrumentalEnded = ended;
+        _currentWordDone = done;
         CurrentMain = ResolveMainText(idx);
         CurrentTrans = idx >= 0 ? _doc.Lines[idx].Translation ?? "" : "";
         Raise();
+    }
+
+    /// <summary>统计当前行已唱字符数（逐字时间戳 ≤ 播放位置的字符累计）；无逐字 → -1。</summary>
+    private static int CountDoneChars(LyricLine line, long posMs)
+    {
+        var words = line.Words;
+        if (words == null || words.Count == 0)
+            return -1;
+        var n = 0;
+        foreach (var w in words)
+        {
+            if (w.TimeMs > posMs)
+                break;
+            n += w.Text.Length;
+        }
+        return n;
     }
 
     /// <summary>伴奏/间奏/前奏一律显示 "···"，始终保持有内容。</summary>

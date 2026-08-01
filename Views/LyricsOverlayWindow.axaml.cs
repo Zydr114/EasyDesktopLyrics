@@ -47,7 +47,7 @@ public sealed partial class LyricsOverlayWindow : Window
 
     // 动态文本层
     private Grid _mainGrid = null!;
-    private TextBlock _mainTb = null!;
+    private LyricText _mainLyric = null!;
     private Grid _transGrid = null!;
     private TextBlock _transTb = null!;
     private readonly List<TextBlock> _strokeLayers = [];
@@ -127,8 +127,9 @@ public sealed partial class LyricsOverlayWindow : Window
         _strokeLayers.Clear();
 
         _mainGrid = new Grid();
-        _mainTb = CreateBoundTb("MainText");
-        _mainGrid.Children.Add(_mainTb);
+        _mainLyric = new LyricText();
+        BindLyric(_mainLyric);
+        _mainGrid.Children.Add(_mainLyric);
         RootPanel.Children.Add(_mainGrid);
 
         _transGrid = new Grid();
@@ -140,6 +141,24 @@ public sealed partial class LyricsOverlayWindow : Window
         ApplyGlow();
         ApplyAlignment();
         SyncAllBindings();
+    }
+
+    /// <summary>主行自绘控件：逐字分段着色 + 内部描边；辉光由下方 GlowLayer 提供，阴影绑定 Effect。</summary>
+    private void BindLyric(LyricText lt)
+    {
+        lt.Bind(LyricText.TextProperty, new Avalonia.Data.Binding("MainText"));
+        lt.Bind(LyricText.HighlightLengthProperty, new Avalonia.Data.Binding("WordHighlightLength"));
+        lt.Bind(LyricText.FontFamilyProperty, new Avalonia.Data.Binding("FontFamilyValue"));
+        lt.Bind(LyricText.FontWeightProperty, new Avalonia.Data.Binding("WeightValue"));
+        lt.Bind(LyricText.FontSizeProperty, new Avalonia.Data.Binding("MainFontSize"));
+        lt.Bind(LyricText.FillProperty, new Avalonia.Data.Binding("Fill"));
+        lt.Bind(LyricText.InactiveFillProperty, new Avalonia.Data.Binding("InactiveFill"));
+        lt.Bind(LyricText.StrokeEnabledProperty, new Avalonia.Data.Binding("StrokeEnabled"));
+        lt.Bind(LyricText.StrokeBrushProperty, new Avalonia.Data.Binding("StrokeBrush"));
+        lt.Bind(LyricText.StrokeThicknessProperty, new Avalonia.Data.Binding("StrokeThickness"));
+        lt.Bind(LyricText.TextAlignmentProperty, new Avalonia.Data.Binding("TextAlignment"));
+        lt.Bind(LyricText.OpacityProperty, new Avalonia.Data.Binding("TextOpacity"));
+        lt.Bind(Visual.EffectProperty, new Avalonia.Data.Binding("TextEffect"));
     }
 
     private TextBlock CreateBoundTb(string textProp)
@@ -159,13 +178,12 @@ public sealed partial class LyricsOverlayWindow : Window
 
     private void SyncAllBindings()
     {
-        SyncTb(_mainTb, "MainFontSize", "Fill", "TextOpacity");
         SyncTb(_transTb, "EffectiveTransFontSize", "Fill", "TextOpacity");
         _transTb.Bind(TextBlock.IsVisibleProperty, new Avalonia.Data.Binding("ShowTransLine"));
 
         foreach (var s in _strokeLayers)
         {
-            SyncTb(s, s == _mainTb ? "MainFontSize" : "EffectiveTransFontSize", null, "TextOpacity");
+            SyncTb(s, "EffectiveTransFontSize", null, "TextOpacity");
             s.Bind(TextBlock.ForegroundProperty, new Avalonia.Data.Binding("StrokeBrush"));
         }
     }
@@ -178,11 +196,11 @@ public sealed partial class LyricsOverlayWindow : Window
         tb.Bind(TextBlock.OpacityProperty, new Avalonia.Data.Binding(opacityProp));
     }
 
+    /// <summary>描边层（仅翻译行；主行描边由自绘控件内部处理）。</summary>
     private void ApplyStroke()
     {
         foreach (var s in _strokeLayers)
         {
-            _mainGrid.Children.Remove(s);
             _transGrid.Children.Remove(s);
         }
         _strokeLayers.Clear();
@@ -192,17 +210,6 @@ public sealed partial class LyricsOverlayWindow : Window
         double t = _vm.StrokeThickness;
         foreach (var (dx, dy) in StrokeOffsets)
         {
-            var sm = new TextBlock
-            {
-                RenderTransform = new TranslateTransform(dx * t, dy * t),
-            };
-            BindTb(sm, "MainText");
-            sm.Bind(TextBlock.ForegroundProperty, new Avalonia.Data.Binding("StrokeBrush"));
-            sm.Bind(TextBlock.FontSizeProperty, new Avalonia.Data.Binding("MainFontSize"));
-            sm.Bind(TextBlock.OpacityProperty, new Avalonia.Data.Binding("TextOpacity"));
-            _mainGrid.Children.Insert(0, sm);
-            _strokeLayers.Add(sm);
-
             var st = new TextBlock
             {
                 RenderTransform = new TranslateTransform(dx * t, dy * t),
@@ -560,7 +567,7 @@ public sealed partial class LyricsOverlayWindow : Window
     private void ApplyAlignment()
     {
         var alig = _vm.TextAlignment;
-        _mainTb.TextAlignment = alig;
+        _mainLyric.TextAlignment = alig;
         _transTb.TextAlignment = alig;
         foreach (var s in _strokeLayers) s.TextAlignment = alig;
         foreach (var s in _glowLayers) s.TextAlignment = alig;

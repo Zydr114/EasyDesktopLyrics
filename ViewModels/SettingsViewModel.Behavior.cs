@@ -19,6 +19,16 @@ public sealed partial class SettingsViewModel
         }
     }
 
+    public bool WordByWord
+    {
+        get => _settings.Current.WordByWord;
+        set
+        {
+            if (value == _settings.Current.WordByWord) return;
+            _settings.Update(s => s.WordByWord = value);
+        }
+    }
+
     public IReadOnlyList<string> AlignmentOptions { get; } = ["居中", "左对齐", "右对齐"];
 
     private static readonly string[] AlignmentValues = ["Center", "Left", "Right"];

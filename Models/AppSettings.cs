@@ -35,6 +35,8 @@ public sealed class AppSettings
 
     // ---- 行为 ----
     public bool ShowTranslation { get; set; }
+    /// <summary>逐字歌词（卡拉 OK）：有逐字时间戳（网易 yrc）时按字高亮，无则整行。</summary>
+    public bool WordByWord { get; set; } = true;
     /// <summary>歌词对齐："Left" / "Center" / "Right"。</summary>
     public string Alignment { get; set; } = "Center";
     public bool HideWhenPaused { get; set; }

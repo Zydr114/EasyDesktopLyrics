@@ -90,6 +90,22 @@
         </StackPanel>
       </Border>
 
+      <!-- 逐字歌词 -->
+      <Border Classes="card">
+        <StackPanel Spacing="10">
+          <StackPanel Spacing="2">
+            <TextBlock Classes="cardTitle" Text="逐字歌词" />
+            <TextBlock Classes="cardDesc"
+                       Text="歌词含逐字时间戳（网易云 yrc）时按字高亮；无逐字数据自动回退整行高亮。" />
+          </StackPanel>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <TextBlock Text="卡拉 OK 逐字高亮效果" FontSize="13" VerticalAlignment="Center" />
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding WordByWord, Mode=TwoWay}"
+                          OnContent="" OffContent="" VerticalAlignment="Center" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
       <!-- 时间偏移 -->
       <Border Classes="card">
         <StackPanel Spacing="10">
