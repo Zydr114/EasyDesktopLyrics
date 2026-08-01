@@ -45,6 +45,7 @@ public sealed partial class LyricsOrchestrator
     private bool _instrumentalEnded;
     private bool _hasWords;
     private int _currentWordDone = -1;
+    private double _currentWordFrac;
 
     public LyricsOrchestrator(
         SmtcService smtc,
@@ -84,6 +85,9 @@ public sealed partial class LyricsOrchestrator
     /// <summary>当前行已唱字符数；-1 = 非逐字模式（整行高亮）。</summary>
     public int CurrentWordDone => _currentWordDone;
 
+    /// <summary>正在唱字符的渐变进度 0~1（字符内平滑点亮）；非逐字模式为 0。</summary>
+    public double CurrentWordFraction => _currentWordFrac;
+
     /// <summary>任何展示相关状态变化（相位/当前行/播放状态）。UI 线程回调。</summary>
     public event Action? StateChanged;
 
@@ -101,6 +105,7 @@ public sealed partial class LyricsOrchestrator
         _hasWords = false;
         _lineIndex = -1;
         _currentWordDone = -1;
+        _currentWordFrac = 0;
         CurrentMain = "";
         CurrentTrans = "";
         UpdateTimer();
@@ -128,6 +133,7 @@ public sealed partial class LyricsOrchestrator
         _lineIndex = -1;
         _songOffsetMs = 0;
         _currentWordDone = -1;
+        _currentWordFrac = 0;
         CurrentMain = "";
         CurrentTrans = "";
         _clock.Reset();
@@ -190,6 +196,7 @@ public sealed partial class LyricsOrchestrator
             _songOffsetMs = songOffset;
             _lineIndex = -1;
             _currentWordDone = -1;
+            _currentWordFrac = 0;
             CurrentMain = "";
             CurrentTrans = "";
             Phase = doc != null ? LyricsPhase.Ready : LyricsPhase.NoLyric;
@@ -470,7 +477,7 @@ public sealed partial class LyricsOrchestrator
         var shouldRun = Phase == LyricsPhase.Ready && _clock.IsPlaying;
         if (shouldRun && !_timer.IsEnabled)
         {
-            _timer.Interval = WordMode ? TimeSpan.FromMilliseconds(50) : TimeSpan.FromMilliseconds(100);
+            _timer.Interval = WordMode ? TimeSpan.FromMilliseconds(30) : TimeSpan.FromMilliseconds(100);
             _timer.Start();
         }
         else if (!shouldRun && _timer.IsEnabled)
@@ -491,33 +498,48 @@ public sealed partial class LyricsOrchestrator
         var ended = _doc.IsInstrumental && _doc.Lines.Count > 0
                     && pos > _doc.Lines[^1].TimeMs + 5000;
 
-        var done = WordMode && idx >= 0 ? CountDoneChars(_doc.Lines[idx], pos) : -1;
+        var (done, frac) = WordMode && idx >= 0
+            ? CountDoneChars(_doc.Lines[idx], pos)
+            : (-1, 0);
 
-        if (idx == _lineIndex && ended == _instrumentalEnded && done == _currentWordDone && !forceRaise)
+        if (idx == _lineIndex && ended == _instrumentalEnded
+            && done == _currentWordDone && Math.Abs(frac - _currentWordFrac) < 0.0005 && !forceRaise)
             return;
 
         _lineIndex = idx;
         _instrumentalEnded = ended;
         _currentWordDone = done;
+        _currentWordFrac = frac;
         CurrentMain = ResolveMainText(idx);
         CurrentTrans = idx >= 0 ? _doc.Lines[idx].Translation ?? "" : "";
         Raise();
     }
 
-    /// <summary>统计当前行已唱字符数（逐字时间戳 ≤ 播放位置的字符累计）；无逐字 → -1。</summary>
-    private static int CountDoneChars(LyricLine line, long posMs)
+    /// <summary>
+    /// 统计当前行已唱字符数与正在唱字符的渐变进度：
+    /// 已唱字符数 = 时间戳 ≤ 播放位置的字符累计；正在唱字进度 = (pos - 字起始) / 字时长
+    /// （字时长 = 下一字起始 - 本字起始；末字用 3 秒兜底）。无逐字 → (-1, 0)。
+    /// </summary>
+    private static (int Count, double Frac) CountDoneChars(LyricLine line, long posMs)
     {
         var words = line.Words;
         if (words == null || words.Count == 0)
-            return -1;
+            return (-1, 0);
         var n = 0;
-        foreach (var w in words)
+        for (var i = 0; i < words.Count; i++)
         {
-            if (w.TimeMs > posMs)
-                break;
-            n += w.Text.Length;
+            var t = words[i].TimeMs;
+            if (t > posMs)
+            {
+                var end = i + 1 < words.Count
+                    ? words[i + 1].TimeMs
+                    : t + 3000; // 末字时长兜底
+                var dur = Math.Max(end - t, 1);
+                return (n, Math.Clamp((posMs - t) / (double)dur, 0, 1));
+            }
+            n += words[i].Text.Length;
         }
-        return n;
+        return (n, 1);
     }
 
     /// <summary>伴奏/间奏/前奏一律显示 "···"，始终保持有内容。</summary>

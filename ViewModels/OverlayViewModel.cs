@@ -21,7 +21,7 @@ public sealed class OverlayViewModel : ObservableObject
         nameof(TextAlignment), nameof(GlowEnabled),
         nameof(InactiveStrokeEnabled), nameof(InactiveStrokeBrush), nameof(InactiveStrokeThickness), nameof(InactiveGlowEffect),
         nameof(CoverImage), nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverSizePct),
-        nameof(WordHighlightLength),
+        nameof(WordHighlightLength), nameof(WordHighlightFraction),
     ];
 
     private static readonly IBrush TransparentBrush = new SolidColorBrush(Colors.Transparent);
@@ -304,6 +304,9 @@ public sealed class OverlayViewModel : ObservableObject
 
     /// <summary>当前行已唱字符数；-1 = 非逐字模式（整行高亮）。</summary>
     public int WordHighlightLength => _orchestrator.CurrentWordDone;
+
+    /// <summary>正在唱字符的平滑渐变进度 0~1（与 WordHighlightLength 配合实现字符内点亮动画）。</summary>
+    public double WordHighlightFraction => _orchestrator.CurrentWordFraction;
 
     public double TextOpacity => Math.Clamp(S.Opacity, 0.05, 1.0);
 

@@ -1,113 +1,60 @@
-# SimpleDesktopLyrics
+# EasyDesktopLyrics
 
-极简 Windows 桌面歌词——通过 [SMTC](https://learn.microsoft.com/windows/uwp/audio-video-camera/system-media-transport-controls) 与任意播放器同步，悬浮于桌面所有窗口之上，鼠标穿透（待实现）、不打扰正常使用。
+Windows 桌面歌词工具。通过 [SMTC](https://learn.microsoft.com/windows/uwp/audio-video-camera/system-media-transport-controls) 跟随外部播放器同步显示歌词，歌词窗口常驻桌面并支持鼠标穿透（锁定后完全不挡操作），透明、轻量、即开即用。
 
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%201909+-blue)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![Avalonia](https://img.shields.io/badge/Avalonia-12.1-8A2BE2)
 
-## 截图
-
-![悬浮歌词](screenshots/overlay.png)
-![设置面板](screenshots/settings.png)
-
 ## 功能
 
 | 功能 | 说明 |
 |------|------|
-| **SMTC 同步** | 自动检测 Spotify、网易云音乐、QQ 音乐、Apple Music、foobar2000、浏览器播放器等任何发布 SMTC 的程序 |
-| **自动匹配歌词** | 从网易云音乐 / QQ 音乐公开接口搜索并匹配 LRC 歌词，本地缓存永久有效 |
-| **桌面悬浮** | 歌词置顶于所有窗口、鼠标完全穿透、不抢焦点、不出现在 Alt+Tab 和任务栏 |
-| **描边 & 阴影** | 8 方向偏移文字描边 + 投影，保证任意桌面背景下可读 |
-| **翻译行** | 支持网易云 tlyric 翻译，可独立调整字号和行间距 |
-| **全光谱色板** | 内置 100 色 PS 式色板，一键选取歌词颜色 |
-| **位置预设** | 九宫格快捷定位 + 水平/垂直百分比滑块，覆盖屏幕任意位置 |
-| **手动校正** | 自动匹配失败时可手动搜索指定歌词，支持单曲偏移 |
-| **极轻量** | 唯一第三方依赖为 Avalonia，**单 exe 无需任何额外文件**，约 21MB，空闲 CPU ≈ 0% |
+| **SMTC 同步** | 自动跟随 Spotify、网易云音乐、QQ 音乐、Apple Music、foobar2000 等任何发布 SMTC 会话的播放器 |
+| **自动匹配歌词** | 网易云音乐 / QQ 音乐 / LRCLIB / 本地 LRC 目录多源自动匹配，来源顺序可配置 |
+| **逐字歌词（实验性）** | 网易云 yrc 逐字时间戳 → 卡拉 OK 式按字高亮；无逐字数据自动回退整行高亮 |
+| **已唱 / 未唱样式隔离** | 颜色、不透明度、描边、辉光均可独立设置；未唱段默认弱化，保证逐字明暗对比 |
+| **文字特效** | 阴影、描边（宽度 0.1–4）、辉光可自由组合，任意背景下保证可读性 |
+| **窗口锁定** | 锁定后鼠标穿透且不可拖动，歌词完全悬浮于桌面，不干扰任何操作 |
+| **歌词封面** | 常驻封面显示 + 切歌居中淡入动画，尺寸/时长可调 |
+| **位置预设** | 九宫格一键定位 + 水平/垂直百分比微调 |
+| **手动校正** | 自动匹配不理想时手动指定歌词源/歌曲，支持单曲时间偏移 |
+| **全局时间偏移** | 歌词整体提前/延后微调 |
+| **托盘控制** | 显示/隐藏歌词、锁定、退出均可在托盘完成 |
+| **轻量** | 单 exe 绿色运行，无任何后台服务，静态渲染时 CPU 占用约 0% |
 
 ## 使用
 
-1. 下载最新 [Release](https://github.com/Zydr114/SimpleDesktopLyrics/releases) 中的 `EasyDesktopLyrics.exe`，放到任意目录双击运行
-2. 运行 `EasyDesktopLyrics.exe`
-3. 打开任意音乐播放器开始播放，歌词自动出现
-4. 右下角托盘图标：**锁定/解锁拖动** · **显示/隐藏** · **设置** · **退出**
-5. 解锁状态下可拖动歌词窗口，双击托盘菜单"锁定歌词位置"恢复
+1. 从 [Release](https://github.com/Zydr114/SimpleDesktopLyrics/releases) 下载压缩包，解压后双击 `EasyDesktopLyrics.exe`。
+2. 打开任意支持的播放器开始播放，歌词窗口自动出现。
+3. 托盘图标 → 锁定歌词（鼠标穿透），歌词即完全悬浮于桌面。
 
-## 设置项
-
-### 外观
-
-| 设置 | 说明 |
-|------|------|
-| 字体 | 从系统已安装字体中选择，下方实时预览 |
-| 正文字号 | 歌词正文的字体大小（DIP），直接输入数值 |
-| 字重 | 常规(400) / 中等(500) / 半粗(600) / 粗体(700) |
-| 翻译字号 | 翻译行的字体大小，设为 0 时自动取正文字号的 60% |
-| 行间距 | 正文与翻译行之间的间距（DIP） |
-| 文字颜色 | 正文与翻译的文字颜色，支持 hex 直输、6 个快捷色块、100 色全光谱色板 |
-| 文字阴影 | 开启后文字带投影，增强可读性 |
-| 文字描边 | 开启后在文字周围叠加 8 方向偏移层，可独立设置描边颜色（含预览框）和宽度（1–8px 滑块） |
-| 不透明度 | 歌词整体透明度（10%–100% 滑块） |
-| 最大宽度 | 歌词行最大宽度（DIP），超宽自动等比缩小 |
-| 位置预设 | 九宫格下拉快捷定位：左上/中上/右上/左中/居中/右中/左下/中下/右下/自定义 |
-| 水平 / 垂直 | 百分比滑块（5%–95%），用于自定义位置的精细调节 |
-
-### 行为
-
-| 设置 | 说明 |
-|------|------|
-| 显示翻译行 | 实时开关翻译显示 |
-| 对齐方式 | 歌词对齐方式：居中 / 左对齐 / 右对齐 |
-| 暂停时隐藏 | 播放暂停时自动隐藏歌词窗口 |
-| 无歌词时显示曲目标题 | 未匹配到歌词时显示"艺术家 - 标题"作为替代 |
-| 开机自启 | 通过注册表 HKCU Run 键实现 |
-
-### SMTC & 歌词源
-
-| 设置 | 说明 |
-|------|------|
-| 监听播放器 | 选择自动跟随系统当前会话，或锁定某个播放器（避免浏览器等干扰） |
-| 歌词源 | 单独开关网易云音乐 / QQ 音乐，可调整优先级（前者优先或后者优先） |
-| 全局歌词偏移 | 全局时间偏移（毫秒），正值 = 歌词提前显示 |
-| 手动校正 | 对当前曲目手动搜索歌词并指定，支持单曲偏移校正 |
+> 首次运行会自动从各来源拉取歌词并缓存到 `%APPDATA%\EasyDesktopLyrics\`。
 
 ## 构建
 
-```powershell
-# 需要 .NET 10 SDK
+环境要求：.NET 10 SDK、Windows 10 1909+。
+
+```bash
 git clone https://github.com/Zydr114/SimpleDesktopLyrics.git
-cd SimpleDesktopLyrics
-
-# Debug 运行
-dotnet run
-
-# 自包含发布
-dotnet publish -c Release -r win-x64 --self-contained true `
-  -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true `
-  -p:PublishTrimmed=true -p:TrimMode=partial
-
-# 产物为单个 EasyDesktopLyrics.exe，无需任何额外文件即可分发
-# bin\Release\net10.0-windows10.0.19041.0\win-x64\publish\
+cd EasyDesktopLyrics
+dotnet build -c Release
 ```
 
-```powershell
-# 调试命令
-.\EasyDesktopLyrics.exe --probe "歌名" "歌手"   # 测试歌词搜索
-.\EasyDesktopLyrics.exe --probe-smtc             # 测试 SMTC 会话
-```
+## 歌词来源
 
-## 技术栈
+- **网易云音乐**：搜索 + LRC + 逐字 yrc（weapi，无需登录）
+- **QQ 音乐**：搜索 + LRC（klyric 逐字不可用，仅行级）
+- **LRCLIB**：开放社区歌词库（欧美/日韩覆盖好）
+- **本地目录**：指定文件夹内的 `*.lrc` 文件，按曲名/歌手自动匹配
 
-| 组件 | 选型 | 说明 |
-|------|------|------|
-| 运行时 | .NET 10 | net10.0-windows10.0.19041.0（LTS） |
-| UI 框架 | Avalonia 12.1 | FluentTheme，手写 MVVM，零框架 |
-| SMTC | `Windows.Media.Control` | WinRT 投影，Windows SDK 自带，无额外包 |
-| HTTP | `HttpClient`（单例） | 8s 超时，gzip 自动解压 |
-| JSON | `System.Text.Json` | 源生成（`JsonSerializerContext`），裁剪安全 |
-| 存储 | `%AppData%\EasyDesktopLyrics\` | settings.json / overrides.json / cache/ |
-| 穿透 | `WS_EX_TRANSPARENT` | P/Invoke，与 Avalonia DirectComposition 兼容 |
+歌词缓存于 `%APPDATA%\EasyDesktopLyrics\cache\lyrics\`，清空即强制重新拉取。
 
-## 许可
+## 隐私
 
-MIT
+- 应用不收集任何数据，不注册开机自启（除非自行配置）。
+- 歌词接口均为各平台非官方公开接口，仅供个人学习使用；请在符合平台条款的前提下使用。
+
+## License
+
+[MIT](LICENSE)

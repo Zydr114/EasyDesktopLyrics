@@ -163,35 +163,30 @@ public sealed partial class LyricsOverlayWindow : Window
         SyncAllBindings();
     }
 
-    /// <summary>已唱层：逐字分段着色 + 已唱描边；未唱段透明（由下层未唱层提供底色）。阴影作用于整行。</summary>
+    /// <summary>已唱层：整行已唱色 + 已唱描边，裁剪分界线左侧；阴影作用于整行。</summary>
     private void BindLyric(LyricText lt)
     {
         BindLyricBase(lt);
         lt.Bind(LyricText.HighlightLengthProperty, new Avalonia.Data.Binding("WordHighlightLength"));
         lt.Bind(LyricText.FillProperty, new Avalonia.Data.Binding("Fill"));
-        lt.Bind(LyricText.InactiveFillProperty, new Avalonia.Data.Binding("ActiveLayerInactiveFill"));
         lt.Bind(LyricText.StrokeEnabledProperty, new Avalonia.Data.Binding("StrokeEnabled"));
         lt.Bind(LyricText.StrokeBrushProperty, new Avalonia.Data.Binding("StrokeBrush"));
         lt.Bind(LyricText.StrokeThicknessProperty, new Avalonia.Data.Binding("StrokeThickness"));
         lt.Bind(Visual.EffectProperty, new Avalonia.Data.Binding("TextEffect"));
+        lt.HighlightClip = LyricText.ClipSideMode.Left;
     }
 
-    /// <summary>未唱层：逐字分段（分段语义：已唱段=Fill、未唱段=InactiveFill，故反转绑定）；
-    /// 已唱段透明（由已唱层负责），未唱段 = 未唱色 + 独立未唱描边 + 阴影。</summary>
+    /// <summary>未唱层：整行未唱色 + 独立未唱描边，裁剪分界线右侧（未唱段）+ 阴影。</summary>
     private void BindInactiveLyric(LyricText lt)
     {
         BindLyricBase(lt);
         lt.Bind(LyricText.HighlightLengthProperty, new Avalonia.Data.Binding("WordHighlightLength"));
-        lt.Bind(LyricText.FillProperty, new Avalonia.Data.Binding("ActiveLayerInactiveFill"));
-        lt.Bind(LyricText.InactiveFillProperty, new Avalonia.Data.Binding("InactiveFill"));
-        // 未唱层只负责未唱段：已唱段底色与描边均透明，未唱段描边用独立未唱描边色
+        lt.Bind(LyricText.FillProperty, new Avalonia.Data.Binding("InactiveFill"));
         lt.Bind(LyricText.StrokeEnabledProperty, new Avalonia.Data.Binding("InactiveStrokeEnabled"));
-        lt.Bind(LyricText.StrokeBrushProperty, new Avalonia.Data.Binding("ActiveLayerInactiveFill"));
-        // 控件级固定启用未唱段描边分段（已唱段描边=StrokeBrush 透明，未唱段=InactiveStrokeBrush 未唱描边色）
-        lt.InactiveStrokeEnabled = true;
-        lt.Bind(LyricText.InactiveStrokeBrushProperty, new Avalonia.Data.Binding("InactiveStrokeBrush"));
+        lt.Bind(LyricText.StrokeBrushProperty, new Avalonia.Data.Binding("InactiveStrokeBrush"));
         lt.Bind(LyricText.StrokeThicknessProperty, new Avalonia.Data.Binding("InactiveStrokeThickness"));
         lt.Bind(Visual.EffectProperty, new Avalonia.Data.Binding("TextEffect"));
+        lt.HighlightClip = LyricText.ClipSideMode.Right;
     }
 
     private static void BindLyricBase(LyricText lt)
@@ -202,6 +197,7 @@ public sealed partial class LyricsOverlayWindow : Window
         lt.Bind(LyricText.FontSizeProperty, new Avalonia.Data.Binding("MainFontSize"));
         lt.Bind(LyricText.TextAlignmentProperty, new Avalonia.Data.Binding("TextAlignment"));
         lt.Bind(LyricText.OpacityProperty, new Avalonia.Data.Binding("TextOpacity"));
+        lt.Bind(LyricText.HighlightFractionProperty, new Avalonia.Data.Binding("WordHighlightFraction"));
     }
 
     private TextBlock CreateBoundTb(string textProp)
@@ -279,25 +275,25 @@ public sealed partial class LyricsOverlayWindow : Window
         }
         _glowLayers.Clear();
 
-        // 未唱辉光层（分段语义反转：未唱段=InactiveFill 才有光晕；默认关）
+        // 未唱辉光层（整行未唱色 + 未唱辉光，裁分界线右侧；默认关）
         if (_vm.InactiveGlowEnabled)
         {
             var ig = CreateMainGlowLyric(null);
             ig.Bind(LyricText.HighlightLengthProperty, new Avalonia.Data.Binding("WordHighlightLength"));
-            ig.Bind(LyricText.FillProperty, new Avalonia.Data.Binding("ActiveLayerInactiveFill"));
-            ig.Bind(LyricText.InactiveFillProperty, new Avalonia.Data.Binding("InactiveFill"));
+            ig.Bind(LyricText.FillProperty, new Avalonia.Data.Binding("InactiveFill"));
             ig.Bind(Visual.EffectProperty, new Avalonia.Data.Binding("InactiveGlowEffect"));
+            ig.HighlightClip = LyricText.ClipSideMode.Right;
             _mainGrid.Children.Insert(0, ig);
             _glowLayers.Add(ig);
         }
 
         if (_vm.GlowEnabled)
         {
-            // 主行已唱辉光：未唱段透明 → DropShadowEffect 只对已唱字形投影
+            // 主行已唱辉光：裁分界线左侧 → DropShadowEffect 只照亮已唱段（含正在唱字已唱半）
             var gm = CreateMainGlowLyric("Fill");
             gm.Bind(LyricText.HighlightLengthProperty, new Avalonia.Data.Binding("WordHighlightLength"));
-            gm.Bind(LyricText.InactiveFillProperty, new Avalonia.Data.Binding("ActiveLayerInactiveFill"));
             gm.Bind(Visual.EffectProperty, new Avalonia.Data.Binding("GlowEffect"));
+            gm.HighlightClip = LyricText.ClipSideMode.Left;
             _mainGrid.Children.Insert(0, gm);
             _glowLayers.Add(gm);
 

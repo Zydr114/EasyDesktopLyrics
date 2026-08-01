@@ -8,9 +8,11 @@ using Avalonia.Utilities;
 namespace EasyDesktopLyrics.Views;
 
 /// <summary>
-/// 自绘歌词文本：TextLayout 分段着色实现卡拉 OK 逐字高亮；
-/// 描边 = 8 向偏移整行绘制（无需逐字）；辉光由外部 Effect 提供。
-/// HighlightLength = -1 时整行单色（无逐字数据兜底）。
+/// 自绘歌词文本：整行单色 TextLayout + 按分界线 PushClip 裁剪实现卡拉 OK 逐字高亮；
+/// 已唱层裁左侧（ClipSide=Left）、未唱层裁右侧（ClipSide=Right），分界线在正在唱字符内部
+/// 随 HighlightFraction 平滑移动（字符内同时存在已唱/未唱两种样式）。
+/// 描边 = 8 向偏移整行绘制；辉光由外部 Effect 提供（作用于裁剪后的结果）。
+/// HighlightLength = -1 或 h&gt;=len 时不裁剪（整行单色）。
 /// </summary>
 public sealed class LyricText : Control
 {
@@ -20,12 +22,28 @@ public sealed class LyricText : Control
         (-0.7, -0.7), (0.7, 0.7), (-0.7, 0.7), (0.7, -0.7),
     };
 
+    /// <summary>裁剪模式：0 = 不裁剪，1 = 裁分界线左侧（显示已唱段），2 = 裁分界线右侧（显示未唱段）。</summary>
+    public enum ClipSideMode
+    {
+        None = 0,
+        Left = 1,
+        Right = 2,
+    }
+
     public static readonly StyledProperty<string?> TextProperty =
         AvaloniaProperty.Register<LyricText, string?>(nameof(Text));
 
-    /// <summary>已唱字符数；-1 = 整行单色。</summary>
+    /// <summary>已唱字符数；-1 = 整行单色（无逐字数据）。</summary>
     public static readonly StyledProperty<int> HighlightLengthProperty =
         AvaloniaProperty.Register<LyricText, int>(nameof(HighlightLength), -1);
+
+    /// <summary>正在唱字符的渐变进度 0~1（分界线在字内从左向右移动）。</summary>
+    public static readonly StyledProperty<double> HighlightFractionProperty =
+        AvaloniaProperty.Register<LyricText, double>(nameof(HighlightFraction), 0);
+
+    /// <summary>裁剪模式（层角色固定，由宿主设置）。</summary>
+    public static readonly StyledProperty<ClipSideMode> HighlightClipProperty =
+        AvaloniaProperty.Register<LyricText, ClipSideMode>(nameof(HighlightClip), ClipSideMode.None);
 
     public static readonly StyledProperty<FontFamily> FontFamilyProperty =
         AvaloniaProperty.Register<LyricText, FontFamily>(nameof(FontFamily), FontFamily.Default);
@@ -75,12 +93,13 @@ public sealed class LyricText : Control
     {
         AffectsMeasure<LyricText>(
             TextProperty, FontFamilyProperty, FontWeightProperty, FontSizeProperty,
-            MaxTextWidthProperty, HighlightLengthProperty);
+            MaxTextWidthProperty);
         AffectsRender<LyricText>(
             TextProperty, FontFamilyProperty, FontWeightProperty, FontSizeProperty,
             FillProperty, InactiveFillProperty, StrokeBrushProperty, StrokeEnabledProperty,
             StrokeThicknessProperty, InactiveStrokeEnabledProperty, InactiveStrokeBrushProperty,
-            TextAlignmentProperty, HighlightLengthProperty, MaxTextWidthProperty);
+            TextAlignmentProperty, HighlightLengthProperty, HighlightFractionProperty,
+            HighlightClipProperty, MaxTextWidthProperty);
     }
 
     public string? Text
@@ -93,6 +112,18 @@ public sealed class LyricText : Control
     {
         get => GetValue(HighlightLengthProperty);
         set => SetValue(HighlightLengthProperty, value);
+    }
+
+    public double HighlightFraction
+    {
+        get => GetValue(HighlightFractionProperty);
+        set => SetValue(HighlightFractionProperty, value);
+    }
+
+    public ClipSideMode HighlightClip
+    {
+        get => GetValue(HighlightClipProperty);
+        set => SetValue(HighlightClipProperty, value);
     }
 
     public FontFamily FontFamily
@@ -167,11 +198,23 @@ public sealed class LyricText : Control
         set => SetValue(TextAlignmentProperty, value);
     }
 
-    /// <summary>任何属性变化都标记布局陈旧：绘制前重建（颜色/字号等实时生效）。</summary>
+    /// <summary>布局相关属性变化才重建；逐字进度/裁剪只重绘（布局为整行单色，无需重建）。</summary>
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        _layoutDirty = true;
+        var p = change.Property;
+        if (p == TextProperty || p == FontFamilyProperty || p == FontWeightProperty || p == FontSizeProperty
+            || p == MaxTextWidthProperty || p == TextAlignmentProperty
+            || p == FillProperty || p == InactiveFillProperty
+            || p == StrokeBrushProperty || p == InactiveStrokeBrushProperty
+            || p == StrokeThicknessProperty || p == StrokeEnabledProperty || p == InactiveStrokeEnabledProperty)
+        {
+            _layoutDirty = true;
+        }
+        else
+        {
+            InvalidateVisual();
+        }
     }
 
     public override void Render(DrawingContext context)
@@ -182,6 +225,31 @@ public sealed class LyricText : Control
             return;
 
         var thickness = StrokeEnabled ? StrokeThickness : 0;
+
+        var clipped = false;
+        if (HighlightClip != ClipSideMode.None && body.Width > 0)
+        {
+            var clipX = ComputeClipX(body);
+            if (clipX > 0 && clipX < body.Width)
+            {
+                var rect = HighlightClip == ClipSideMode.Left
+                    ? new Rect(0, 0, clipX, body.Height)
+                    : new Rect(clipX, 0, Math.Max(0, body.Width - clipX), body.Height);
+                if (rect.Width > 0)
+                {
+                    using var _ = context.PushClip(rect);
+                    clipped = true;
+                    DrawBody(context, body, thickness);
+                    return;
+                }
+            }
+        }
+
+        DrawBody(context, body, thickness);
+    }
+
+    private void DrawBody(DrawingContext context, TextLayout body, double thickness)
+    {
         if (thickness > 0 && _strokeLayout != null)
         {
             foreach (var (dx, dy) in StrokeOffsets)
@@ -222,57 +290,42 @@ public sealed class LyricText : Control
         var maxWidth = double.PositiveInfinity;
         var maxHeight = double.PositiveInfinity;
 
-        var h = HighlightLength;
-        var len = text.Length;
-        // 逐字模式下的分段样式；整行单色（h<0 或 h>=len）时为 null
-        IReadOnlyList<ValueSpan<TextRunProperties>>? styles = null;
-        if (h >= 0 && h < len && Fill != null && InactiveFill != null)
-        {
-            styles = h > 0
-                ? [new ValueSpan<TextRunProperties>(0, h, RunProps(typeface, FontSize, Fill)),
-                   new ValueSpan<TextRunProperties>(h, len - h, RunProps(typeface, FontSize, InactiveFill))]
-                : [new ValueSpan<TextRunProperties>(0, len, RunProps(typeface, FontSize, InactiveFill))];
-        }
-
-        // 描边：与正文同分段——已唱段用 StrokeBrush，未唱段用 InactiveStrokeBrush
-        // （未唱描边关闭时未唱段描边透明，避免整行描边抹平逐字明暗差）
-        var strokeStyles = styles;
-        if (strokeStyles != null && (!InactiveStrokeEnabled || InactiveStrokeBrush == null))
-        {
-            var inactiveStroke = Brushes.Transparent;
-            strokeStyles = h > 0
-                ? [new ValueSpan<TextRunProperties>(0, h, RunProps(typeface, FontSize, StrokeBrush)),
-                   new ValueSpan<TextRunProperties>(h, len - h, RunProps(typeface, FontSize, inactiveStroke))]
-                : [new ValueSpan<TextRunProperties>(0, len, RunProps(typeface, FontSize, inactiveStroke))];
-        }
-        else if (strokeStyles != null)
-        {
-            strokeStyles = h > 0
-                ? [new ValueSpan<TextRunProperties>(0, h, RunProps(typeface, FontSize, StrokeBrush)),
-                   new ValueSpan<TextRunProperties>(h, len - h, RunProps(typeface, FontSize, InactiveStrokeBrush))]
-                : [new ValueSpan<TextRunProperties>(0, len, RunProps(typeface, FontSize, InactiveStrokeBrush))];
-        }
-
+        // 整行单色：逐字明暗由层裁剪（HighlightClip）实现，这里只需一种前景色
         _strokeLayout = StrokeEnabled && StrokeThickness > 0 && StrokeBrush != null
-            ? CreateLayout(text, typeface, StrokeBrush, alignment, wrapping, maxWidth, maxHeight, strokeStyles)
+            ? CreateLayout(text, typeface, StrokeBrush, alignment, wrapping, maxWidth, maxHeight)
             : null;
 
-        _bodyLayout = CreateLayout(text, typeface, Fill, alignment, wrapping, maxWidth, maxHeight, styles);
+        _bodyLayout = CreateLayout(text, typeface, Fill, alignment, wrapping, maxWidth, maxHeight);
+    }
+
+    /// <summary>分界线 X（正在唱字左缘 + 字宽 × 进度）；无逐字/整行完成时返回 -1（不裁剪）。</summary>
+    private double ComputeClipX(TextLayout layout)
+    {
+        var h = HighlightLength;
+        var text = Text;
+        if (h < 0 || text == null)
+            return -1;
+        var len = text.Length;
+        if (h >= len)
+            return -1;
+
+        var frac = Math.Clamp(HighlightFraction, 0, 1);
+        var curLen = char.IsHighSurrogate(text[h]) ? 2 : 1;
+        var x0 = layout.HitTestTextPosition(h).X;
+        var x1 = h + curLen < len
+            ? layout.HitTestTextPosition(h + curLen).X
+            : layout.Width; // 正在唱字为最后一个字符：右缘 = 文本宽度
+        return x0 + (x1 - x0) * frac;
     }
 
     private TextLayout CreateLayout(
         string text, Typeface typeface, IBrush? foreground, TextAlignment alignment,
-        TextWrapping wrapping, double maxWidth, double maxHeight,
-        IReadOnlyList<ValueSpan<TextRunProperties>>? styles)
+        TextWrapping wrapping, double maxWidth, double maxHeight)
     {
         return new TextLayout(text, typeface, FontSize, foreground,
             textAlignment: alignment,
             textWrapping: wrapping,
             maxWidth: maxWidth,
-            maxHeight: maxHeight,
-            textStyleOverrides: styles);
+            maxHeight: maxHeight);
     }
-
-    private static TextRunProperties RunProps(Typeface typeface, double fontSize, IBrush brush) =>
-        new GenericTextRunProperties(typeface, fontSize, foregroundBrush: brush);
 }
