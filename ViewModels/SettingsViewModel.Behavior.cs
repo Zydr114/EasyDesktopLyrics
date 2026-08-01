@@ -73,6 +73,17 @@ public sealed partial class SettingsViewModel
         }
     }
 
+    /// <summary>窗口锁定：完全不可动且鼠标穿透；锁定后仅能通过托盘菜单或本设置解锁。</summary>
+    public bool IsLocked
+    {
+        get => _settings.Current.Locked;
+        set
+        {
+            if (value == _settings.Current.Locked) return;
+            _settings.Update(s => s.Locked = value);
+        }
+    }
+
     // ---------- 播放器优先级 ----------
     public ObservableCollection<PlayerRuleItem> PlayerRules { get; } = [];
 

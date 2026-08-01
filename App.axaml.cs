@@ -65,8 +65,17 @@ public sealed class App : Application
         trayVisible.Click += (_, _) =>
             _settingsService.Update(s => s.LyricsVisible = !s.LyricsVisible);
 
+        var trayLock = new NativeMenuItem("锁定歌词（鼠标穿透）")
+        {
+            ToggleType = MenuItemToggleType.CheckBox,
+            IsChecked = settings.Locked,
+        };
+        trayLock.Click += (_, _) =>
+            _settingsService.Update(s => s.Locked = !s.Locked);
+
         var trayMenu = new NativeMenu();
         trayMenu.Add(trayVisible);
+        trayMenu.Add(trayLock);
         trayMenu.Add(new NativeMenuItemSeparator());
 
         var traySettings = new NativeMenuItem("设置…");
@@ -84,7 +93,9 @@ public sealed class App : Application
             _smtcService.SetPreferredSession(_settingsService.Current.LockedSessionAumid);
             _smtcService.SetPlayerRules(_settingsService.Current.PlayerPriorities);
             _overlay?.UpdateVisibility();
+            _overlay?.SetLocked(_settingsService.Current.Locked);
             trayVisible.IsChecked = _settingsService.Current.LyricsVisible;
+            trayLock.IsChecked = _settingsService.Current.Locked;
         };
 
         var icon = LoadWindowIcon("Assets/app.png");

@@ -182,8 +182,18 @@
       <StackPanel Spacing="10">
         <StackPanel Spacing="2">
           <TextBlock Classes="cardTitle" Text="显示效果" />
-          <TextBlock Classes="cardDesc" Text="单行最大宽度，超出自动等比缩小。" />
+          <TextBlock Classes="cardDesc" Text="歌词整体透明度与单行最大宽度。" />
         </StackPanel>
+        <Grid ColumnDefinitions="110,*,64" ColumnSpacing="14">
+          <TextBlock Classes="sectionLabel" Text="整体不透明度" />
+          <Grid Grid.Column="1" ColumnDefinitions="*,64" ColumnSpacing="14">
+            <Slider Minimum="0.2" Maximum="1" TickFrequency="0.05"
+                    Value="{Binding TextOpacity, Mode=TwoWay}" />
+            <TextBox Grid.Column="1" MinHeight="28" Padding="8,2"
+                     Text="{Binding TextOpacity, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:P0}'}"
+                     TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+          </Grid>
+        </Grid>
         <Grid ColumnDefinitions="110,*,64" ColumnSpacing="14">
           <TextBlock Classes="sectionLabel" Text="最大宽度" />
           <Grid Grid.Column="1" ColumnDefinitions="*,64" ColumnSpacing="14">

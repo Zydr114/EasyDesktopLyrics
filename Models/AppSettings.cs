@@ -44,6 +44,8 @@ public sealed class AppSettings
     public bool AutoStart { get; set; }
     /// <summary>托盘“显示歌词”开关。</summary>
     public bool LyricsVisible { get; set; } = true;
+    /// <summary>窗口锁定：完全不可动且鼠标穿透（WS_EX_TRANSPARENT），仅托盘/设置可解锁。</summary>
+    public bool Locked { get; set; }
 
     // ---- 封面 ----
     /// <summary>播放时常驻显示封面。</summary>

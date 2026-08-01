@@ -225,7 +225,17 @@ public sealed partial class LyricsOrchestrator
                     {
                         var cachedDoc = ParseLyric(cached.Lrc, cached.TransLrc, cached.WordLrc);
                         if (cachedDoc != null)
+                        {
+                            // 缓存无逐字（上次 yrc 获取失败/无数据）→ 后台补拉 yrc，不阻塞歌词显示；
+                            // 网易云 yrc 间歇性不返回，重试可能成功
+                            if (string.IsNullOrEmpty(cached.WordLrc)
+                                && !string.IsNullOrEmpty(cached.SongId)
+                                && _providers.FirstOrDefault(p => p.Id == "netease") is { } yrcProvider)
+                            {
+                                RefreshYrcAsync(key, t, yrcProvider, cached.SongId, ct);
+                            }
                             return (cachedDoc, songOffset);
+                        }
                     }
                 }
             }
@@ -365,6 +375,52 @@ public sealed partial class LyricsOrchestrator
         return matched * 10 >= lines.Count * 6
             ? new LyricDocument(lines, doc.IsInstrumental)
             : doc;
+    }
+
+    /// <summary>
+    /// 后台补拉逐字歌词：缓存命中但无 yrc 时异步重试（网易云接口不稳定）；
+    /// 成功后替换内存文档启用逐字高亮，并更新磁盘缓存。失败静默（保持整行高亮）。
+    /// </summary>
+    private async void RefreshYrcAsync(string key, TrackInfo t, ILyricsProvider provider, string songId, CancellationToken ct)
+    {
+        LyricDocument? withWords = null;
+        RawLyric? raw = null;
+        try
+        {
+            raw = await SafeGetLyricAsync(provider, songId, ct).ConfigureAwait(false);
+            if (raw?.WordLrc != null)
+                withWords = ParseLyric(raw.Lrc, raw.TranslationLrc, raw.WordLrc);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"yrc refresh failed: {t.Title}", ex);
+            return;
+        }
+
+        if (ct.IsCancellationRequested || withWords == null || raw == null)
+            return;
+
+        var hasWords = withWords.Lines.Any(l => l.Words is { Count: > 0 });
+        if (!hasWords)
+            return;
+
+        try { await _cache.SetAsync(key, CachedLyric.Positive(provider.Id, songId, raw)).ConfigureAwait(false); }
+        catch (Exception ex) { Log.Error("cache update (yrc)", ex); }
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (ct.IsCancellationRequested || !ReferenceEquals(Track, t) || _hasWords)
+                return;
+            Log.Info($"yrc refreshed in background: {t.Title}");
+            _doc = withWords;
+            _hasWords = true;
+            Tick(forceRaise: true);
+            Raise();
+        });
     }
 
     private static async Task<RawLyric?> SafeGetLyricAsync(ILyricsProvider provider, string songId, CancellationToken ct)

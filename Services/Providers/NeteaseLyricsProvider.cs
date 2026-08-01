@@ -1,4 +1,5 @@
 using System.Text.Json;
+using EasyDesktopLyrics.Infrastructure;
 using EasyDesktopLyrics.Models;
 
 namespace EasyDesktopLyrics.Services.Providers;
@@ -67,16 +68,49 @@ public sealed class NeteaseLyricsProvider : ILyricsProvider
 
     /// <summary>
     /// 逐字歌词（yrc，新格式）：weapi 匿名可获取；失败/无数据返回 null（不影响主歌词）。
+    /// 网易云对 yrc 字段间歇性不返回（实测同参数多次结果随机）：yv=0/yv=1 双请求任一成功即用，
+    /// 全部失败则延迟重试一轮，最大化成功率。
     /// </summary>
     private static async Task<string?> GetYrcAsync(string songId, CancellationToken ct)
     {
-        var json = $"{{\"id\":\"{songId}\",\"cp\":false,\"tv\":0,\"lv\":0,\"rv\":0,\"kv\":0,\"yv\":0,\"ytv\":0,\"yrv\":0}}";
-        using var doc = await NeteaseWeapi.PostWeapiJsonAsync("/weapi/song/lyric/v1", json, ct).ConfigureAwait(false);
-        var yrc = doc?.RootElement.Get("yrc").Get("lyric").GetStr();
-        if (string.IsNullOrWhiteSpace(yrc))
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            for (var yv = 0; yv <= 1; yv++)
+            {
+                var yrc = await FetchYrcAsync(songId, yv, ct).ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(yrc))
+                    return yrc;
+            }
+            if (attempt == 0)
+            {
+                try { await Task.Delay(1200, ct).ConfigureAwait(false); }
+                catch (OperationCanceledException) { throw; }
+            }
+        }
+        return null;
+    }
+
+    private static async Task<string?> FetchYrcAsync(string songId, int yv, CancellationToken ct)
+    {
+        try
+        {
+            var json = $"{{\"id\":\"{songId}\",\"cp\":false,\"tv\":0,\"lv\":0,\"rv\":0,\"kv\":0,\"yv\":{yv},\"ytv\":0,\"yrv\":0}}";
+            using var doc = await NeteaseWeapi.PostWeapiJsonAsync("/weapi/song/lyric/v1", json, ct).ConfigureAwait(false);
+            var yrc = doc?.RootElement.Get("yrc").Get("lyric").GetStr();
+            if (string.IsNullOrWhiteSpace(yrc))
+                return null;
+            // 仅当存在逐字行（[t,d](t,d,0)字）时有效；纯元数据 JSON 行视为无逐字
+            return yrc.Contains("[") ? yrc : null;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"yrc fetch failed (yv={yv})", ex);
             return null;
-        // 仅当存在逐字行（[t,d](t,d,0)字）时有效；纯元数据 JSON 行视为无逐字
-        return yrc.Contains("[") ? yrc : null;
+        }
     }
 
     private void ParseSongs(JsonElement? songs, List<ProviderSong> list)

@@ -84,7 +84,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         nameof(GlowEnabled), nameof(GlowRadiusVal),
         nameof(ShadowBlurVal), nameof(ShadowOffsetYVal),
         nameof(TransFontSizeVal), nameof(LineSpacingVal), nameof(TextOpacity), nameof(MaxWidth),
-        nameof(ShowTranslation), nameof(HideWhenPaused), nameof(ShowTitleWhenNoLyric), nameof(AutoStartEnabled),
+        nameof(ShowTranslation), nameof(HideWhenPaused), nameof(ShowTitleWhenNoLyric), nameof(AutoStartEnabled), nameof(IsLocked),
         nameof(LyricsFolder), nameof(GlobalOffsetMs),
         nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverSizePctVal),
         nameof(CoverAnimMinSec), nameof(CoverAnimMaxSec),

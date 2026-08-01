@@ -106,6 +106,22 @@
         </StackPanel>
       </Border>
 
+      <!-- 窗口锁定 -->
+      <Border Classes="card">
+        <StackPanel Spacing="10">
+          <StackPanel Spacing="2">
+            <TextBlock Classes="cardTitle" Text="窗口锁定" />
+            <TextBlock Classes="cardDesc"
+                       Text="锁定后窗口完全不可拖动，且鼠标点击穿透到下方应用（适合游戏/全屏场景）；解锁请通过托盘菜单或本开关。" />
+          </StackPanel>
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <TextBlock Text="锁定歌词窗口（鼠标穿透）" FontSize="13" VerticalAlignment="Center" />
+            <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsLocked, Mode=TwoWay}"
+                          OnContent="" OffContent="" VerticalAlignment="Center" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
       <!-- 时间偏移 -->
       <Border Classes="card">
         <StackPanel Spacing="10">

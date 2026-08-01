@@ -30,6 +30,7 @@ public sealed partial class LyricsOverlayWindow : Window
     private readonly UiDebouncer _anchorDebouncer = new();
 
     private IntPtr _hwnd;
+    private bool _locked;
     private PixelPoint _anchor;
     private bool _suppressPositionUpdate;
     private bool _dragStarted;
@@ -54,6 +55,19 @@ public sealed partial class LyricsOverlayWindow : Window
     private readonly List<TextBlock> _glowLayers = [];
 
     public event Action<double, double>? AnchorChanged;
+
+    /// <summary>
+    /// 锁定/解锁窗口：锁定时整个窗口鼠标穿透（WS_EX_TRANSPARENT）且禁止拖动，
+    /// 解锁仅能通过托盘菜单或设置页（穿透后窗口本身无法接收点击）。
+    /// </summary>
+    public void SetLocked(bool locked)
+    {
+        _locked = locked;
+        if (_hwnd == IntPtr.Zero)
+            return;
+        Win32.SetClickThrough(_hwnd, locked);
+        Log.Info($"overlay locked={locked}");
+    }
 
     public LyricsOverlayWindow(OverlayViewModel vm, SettingsService settingsService)
     {
@@ -580,6 +594,7 @@ public sealed partial class LyricsOverlayWindow : Window
         Log.Info($"overlay opened, hwnd={_hwnd:X8}");
         if (_hwnd != IntPtr.Zero)
             Win32.AssertTopmost(_hwnd);
+        SetLocked(_settingsService.Current.Locked);
         UpdatePlayPauseIcon();
         ApplyAnchor();
         UpdateVisibility();
@@ -601,10 +616,12 @@ public sealed partial class LyricsOverlayWindow : Window
             RepositionToAnchor();
     }
 
-    /// <summary>按下即拖动（控制条区域除外，避免与按钮点击冲突）。</summary>
+    /// <summary>按下即拖动（控制条区域除外，避免与按钮点击冲突）；锁定状态下禁止拖动。</summary>
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
+        if (_locked)
+            return;
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             return;
         if (IsInsideControlBar(e.Source as Avalonia.Visual))
