@@ -18,6 +18,15 @@ public sealed partial class ColorPicker : UserControl
     private double _h, _s, _v;
     private double _a = 1.0;
     private bool _suppress;
+    private bool _dragging;
+    private double _lastHue = double.NaN;
+    private Color _lastPreview = default;
+
+    // 静态渐变只建一次（不随颜色变化）；SV 面板白→hue 渐变在色相变化时重建
+    private readonly LinearGradientBrush _hueBrush = BuildHueGradient();
+    private readonly LinearGradientBrush _valueBrush = BuildValueGradient();
+    private readonly LinearGradientBrush _shadeBrush = BuildShadeGradient();
+    private LinearGradientBrush? _panelBrush;
 
     /// <summary>颜色被修改（用户交互或外部赋值）时触发。</summary>
     public event Action<Color>? ColorChanged;
@@ -32,17 +41,17 @@ public sealed partial class ColorPicker : UserControl
     {
         InitializeComponent();
 
-        SvPanel.PointerPressed += OnSvPointer;
+        SvPanel.PointerPressed += OnSvPressed;
         SvPanel.PointerMoved += OnSvPointer;
-        
+        SvPanel.PointerReleased += OnReleased;
 
-        HueBar.PointerPressed += OnHuePointer;
+        HueBar.PointerPressed += OnHuePressed;
         HueBar.PointerMoved += OnHuePointer;
-        
+        HueBar.PointerReleased += OnReleased;
 
-        AlphaBar.PointerPressed += OnAlphaPointer;
-        AlphaBar.PointerMoved += OnAlphaPointer;
-        
+        ValueBar.PointerPressed += OnValuePressed;
+        ValueBar.PointerMoved += OnValuePointer;
+        ValueBar.PointerReleased += OnReleased;
 
         HexBox.TextChanged += OnHexChanged;
         ColorProperty.Changed.AddClassHandler<ColorPicker>((x, _) => x.OnColorExternallyChanged());
@@ -55,11 +64,37 @@ public sealed partial class ColorPicker : UserControl
         OnColorExternallyChanged();
     }
 
+    private void OnSvPressed(object? sender, PointerPressedEventArgs e)
+    {
+        _dragging = true;
+        e.Pointer.Capture(SvPanel);
+        OnSvPointer(sender, e);
+    }
+
+    private void OnHuePressed(object? sender, PointerPressedEventArgs e)
+    {
+        _dragging = true;
+        e.Pointer.Capture(HueBar);
+        OnHuePointer(sender, e);
+    }
+
+    private void OnValuePressed(object? sender, PointerPressedEventArgs e)
+    {
+        _dragging = true;
+        e.Pointer.Capture(ValueBar);
+        OnValuePointer(sender, e);
+    }
+
+    private void OnReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        _dragging = false;
+        e.Pointer.Capture(null);
+    }
+
     private void OnSvPointer(object? sender, PointerEventArgs e)
     {
         if (!e.GetCurrentPoint(SvPanel).Properties.IsLeftButtonPressed)
             return;
-        
 
         var p = e.GetCurrentPoint(SvPanel).Position;
         _s = Math.Clamp(p.X / Math.Max(1, SvPanel.Bounds.Width), 0, 1);
@@ -71,21 +106,19 @@ public sealed partial class ColorPicker : UserControl
     {
         if (!e.GetCurrentPoint(HueBar).Properties.IsLeftButtonPressed)
             return;
-        
 
         var p = e.GetCurrentPoint(HueBar).Position;
         _h = Math.Clamp(p.X / Math.Max(1, HueBar.Bounds.Width), 0, 1) * 360;
         ApplyFromHsv();
     }
 
-    private void OnAlphaPointer(object? sender, PointerEventArgs e)
+    private void OnValuePointer(object? sender, PointerEventArgs e)
     {
-        if (!e.GetCurrentPoint(AlphaBar).Properties.IsLeftButtonPressed)
+        if (!e.GetCurrentPoint(ValueBar).Properties.IsLeftButtonPressed)
             return;
-        
 
-        var p = e.GetCurrentPoint(AlphaBar).Position;
-        _a = Math.Clamp(p.X / Math.Max(1, AlphaBar.Bounds.Width), 0, 1);
+        var p = e.GetCurrentPoint(ValueBar).Position;
+        _v = Math.Clamp(p.X / Math.Max(1, ValueBar.Bounds.Width), 0, 1);
         ApplyFromHsv();
     }
 
@@ -94,20 +127,54 @@ public sealed partial class ColorPicker : UserControl
         _suppress = true;
         Color = HsvToRgb(_h, _s, _v, _a);
         _suppress = false;
-        ColorChanged?.Invoke(Color);
+
+        // 拖动路径轻量刷新：仅重建必要内容（色相变 → SV 面板渐变；预览/Hex 带缓存与防递归）
+        if (_lastHue != _h)
+        {
+            _lastHue = _h;
+            SvPanel.Background = BuildPanelBrush(HsvToRgb(_h, 1, 1, 1));
+        }
+        var c = Color;
+        if (_lastPreview != c)
+        {
+            _lastPreview = c;
+            PreviewBlock.Background = new SolidColorBrush(c);
+        }
+        var hex = FormatHex(c);
+        if (HexBox.Text != hex)
+        {
+            _suppress = true;
+            HexBox.Text = hex;
+            _suppress = false;
+        }
+        UpdateIndicators();
+        ColorChanged?.Invoke(c);
     }
 
     private void OnColorExternallyChanged()
     {
         if (_suppress)
             return;
-        var (h, s, v) = RgbToHsv(Color);
-        _h = h;
-        _s = s;
-        _v = v;
-        _a = Color.A / 255.0;
+        // 拖动中绑定回写的是本控件刚写入的值：跳过 hsv 重算，避免 RGB 量化导致手柄抖动
+        if (_dragging)
+            return;
+        SyncHsvFromColor(Color);
         RefreshUi();
         ColorChanged?.Invoke(Color);
+    }
+
+    /// <summary>
+    /// 由 RGB 同步 HSV 状态；灰/黑/白（无饱和度或明度）时保留当前色相——
+    /// RGB 无法还原色相，否则拖动明暗到端点会重置色相条。
+    /// </summary>
+    private void SyncHsvFromColor(Color c)
+    {
+        var (h, s, v) = RgbToHsv(c);
+        if (s > 0.001 && v > 0.001)
+            _h = h;
+        _s = s;
+        _v = v;
+        _a = c.A / 255.0;
     }
 
     private void OnHexChanged(object? sender, TextChangedEventArgs e)
@@ -119,11 +186,7 @@ public sealed partial class ColorPicker : UserControl
             _suppress = true;
             Color = c;
             _suppress = false;
-            var (h, s, v) = RgbToHsv(c);
-            _h = h;
-            _s = s;
-            _v = v;
-            _a = c.A / 255.0;
+            SyncHsvFromColor(c);
             RefreshUi();
             ColorChanged?.Invoke(c);
         }
@@ -132,34 +195,62 @@ public sealed partial class ColorPicker : UserControl
     private void RefreshUi()
     {
         var hue = HsvToRgb(_h, 1, 1, 1);
+        _lastHue = _h;
+        _lastPreview = Color;
 
-        SvPanel.Background = new LinearGradientBrush
-        {
-            StartPoint = new RelativePoint(0, 0.5, RelativeUnit.Relative),
-            EndPoint = new RelativePoint(1, 0.5, RelativeUnit.Relative),
-            GradientStops =
-            {
-                new GradientStop(Colors.White, 0),
-                new GradientStop(hue, 1),
-            },
-        };
-        SvShade.Background = new LinearGradientBrush
-        {
-            StartPoint = new RelativePoint(0.5, 0, RelativeUnit.Relative),
-            EndPoint = new RelativePoint(0.5, 1, RelativeUnit.Relative),
-            GradientStops =
-            {
-                new GradientStop(Color.FromArgb(0, 0, 0, 0), 0),
-                new GradientStop(Colors.Black, 1),
-            },
-        };
-
-        HueBar.Background = BuildHueGradient();
-        AlphaShade.Background = new SolidColorBrush(HsvToRgb(_h, _s, _v, _a));
+        SvPanel.Background = BuildPanelBrush(hue);
+        SvShade.Background = _shadeBrush;
+        HueBar.Background = _hueBrush;
+        ValueBar.Background = _valueBrush;
         PreviewBlock.Background = new SolidColorBrush(Color);
-        HexBox.Text = FormatHex(Color);
+        SetHexSilently(FormatHex(Color));
         UpdateIndicators();
     }
+
+    /// <summary>设置 Hex 文本但不触发 OnHexChanged 递归刷新。</summary>
+    private void SetHexSilently(string hex)
+    {
+        if (HexBox.Text == hex)
+            return;
+        _suppress = true;
+        HexBox.Text = hex;
+        _suppress = false;
+    }
+
+    private static LinearGradientBrush BuildPanelBrush(Color hue) => new()
+    {
+        StartPoint = new RelativePoint(0, 0.5, RelativeUnit.Relative),
+        EndPoint = new RelativePoint(1, 0.5, RelativeUnit.Relative),
+        GradientStops =
+        {
+            new GradientStop(Colors.White, 0),
+            new GradientStop(hue, 1),
+        },
+    };
+
+    /// <summary>明暗层：透明→黑（静态，不随颜色变化）。</summary>
+    private static LinearGradientBrush BuildShadeGradient() => new()
+    {
+        StartPoint = new RelativePoint(0.5, 0, RelativeUnit.Relative),
+        EndPoint = new RelativePoint(0.5, 1, RelativeUnit.Relative),
+        GradientStops =
+        {
+            new GradientStop(Color.FromArgb(0, 0, 0, 0), 0),
+            new GradientStop(Colors.Black, 1),
+        },
+    };
+
+    /// <summary>明暗条：黑→白渐变（静态）。</summary>
+    private static LinearGradientBrush BuildValueGradient() => new()
+    {
+        StartPoint = new RelativePoint(0, 0.5, RelativeUnit.Relative),
+        EndPoint = new RelativePoint(1, 0.5, RelativeUnit.Relative),
+        GradientStops =
+        {
+            new GradientStop(Colors.Black, 0),
+            new GradientStop(Colors.White, 1),
+        },
+    };
 
     private static LinearGradientBrush BuildHueGradient()
     {
@@ -188,7 +279,7 @@ public sealed partial class ColorPicker : UserControl
         Canvas.SetLeft(SvIndicator, Math.Clamp(_s * svw - 6, -2, Math.Max(0, svw - 10)));
         Canvas.SetTop(SvIndicator, Math.Clamp((1 - _v) * svh - 6, -2, Math.Max(0, svh - 10)));
         Canvas.SetLeft(HueIndicator, _h / 360.0 * Math.Max(0, HueBar.Bounds.Width - 6));
-        Canvas.SetLeft(AlphaIndicator, _a * Math.Max(0, AlphaBar.Bounds.Width - 6));
+        Canvas.SetLeft(ValueIndicator, _v * Math.Max(0, ValueBar.Bounds.Width - 6));
     }
 
     private static string FormatHex(Color c) =>

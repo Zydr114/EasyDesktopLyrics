@@ -24,17 +24,13 @@
       </Canvas>
     </Border>
 
-    <!-- 透明度条 -->
-    <Border x:Name="AlphaBar" Height="14" CornerRadius="6" Cursor="Cross">
-      <Grid>
-        <Border Background="White" CornerRadius="6" />
-        <Border x:Name="AlphaShade" CornerRadius="6" />
-        <Canvas>
-          <Border x:Name="AlphaIndicator" Width="6" Height="18" CornerRadius="2"
-                  BorderBrush="White" BorderThickness="1.5" Background="Transparent"
-                  Canvas.Left="0" Canvas.Top="-2" />
-        </Canvas>
-      </Grid>
+    <!-- 明暗（V）条：黑→白渐变（代码构建，XAML 渐变在部分平台渲染为纯色） -->
+    <Border x:Name="ValueBar" Height="14" CornerRadius="6" Cursor="Cross">
+      <Canvas>
+        <Border x:Name="ValueIndicator" Width="6" Height="18" CornerRadius="2"
+                BorderBrush="White" BorderThickness="1.5" Background="Transparent"
+                Canvas.Left="0" Canvas.Top="-2" />
+      </Canvas>
     </Border>
 
     <!-- Hex 输入 + 预览 -->
