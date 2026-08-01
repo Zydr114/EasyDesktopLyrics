@@ -31,6 +31,7 @@ public sealed partial class LyricsOverlayWindow : Window
 
     private IntPtr _hwnd;
     private bool _locked;
+    private bool _allowClose;
     private PixelPoint _anchor;
     private bool _suppressPositionUpdate;
     private bool _dragStarted;
@@ -69,6 +70,9 @@ public sealed partial class LyricsOverlayWindow : Window
         Win32.SetClickThrough(_hwnd, locked);
         Log.Info($"overlay locked={locked}");
     }
+
+    /// <summary>允许真正关闭窗口（仅程序退出时由 Cleanup 调用，此后窗口不可再显示）。</summary>
+    public void AllowClose() => _allowClose = true;
 
     public LyricsOverlayWindow(OverlayViewModel vm, SettingsService settingsService)
     {
@@ -663,6 +667,21 @@ public sealed partial class LyricsOverlayWindow : Window
         UpdatePlayPauseIcon();
         ApplyAnchor();
         UpdateVisibility();
+    }
+
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        // 桌面歌词窗口不允许用户关闭：关闭 = 隐藏并同步设置（托盘勾选），
+        // 避免窗口销毁后托盘再次 Show() 崩溃；程序退出时由 Cleanup 先置 AllowClose。
+        if (!_allowClose)
+        {
+            e.Cancel = true;
+            if (_settingsService.Current.LyricsVisible)
+                _settingsService.Update(s => s.LyricsVisible = false);
+            Hide();
+            return;
+        }
+        base.OnClosing(e);
     }
 
     protected override void OnClosed(EventArgs e)

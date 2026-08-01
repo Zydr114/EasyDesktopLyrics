@@ -155,6 +155,8 @@ public sealed class App : Application
     {
         try
         {
+            if (_overlay != null)
+                _overlay.AllowClose();
             _overlay?.Close();
             _smtcService.Dispose();
             _settingsService.Flush();
