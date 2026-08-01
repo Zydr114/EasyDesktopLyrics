@@ -12,3 +12,6 @@ obj/
 ## Ignore publish outputs (too large for git, use GitHub Releases)
 publish/
 PublishProfiles/
+
+## Ignore local release packages
+release/
