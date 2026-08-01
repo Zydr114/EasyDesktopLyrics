@@ -226,9 +226,10 @@ public sealed partial class LyricsOrchestrator
                         var cachedDoc = ParseLyric(cached.Lrc, cached.TransLrc, cached.WordLrc);
                         if (cachedDoc != null)
                         {
-                            // 缓存无逐字（上次 yrc 获取失败/无数据）→ 后台补拉 yrc，不阻塞歌词显示；
-                            // 网易云 yrc 间歇性不返回，重试可能成功
+                            Log.Info($"cache hit: {key} [{cached.Source}] words={!string.IsNullOrEmpty(cached.WordLrc)}");                            // 缓存无逐字（上次 yrc 获取失败/无数据）→ 后台补拉 yrc，不阻塞歌词显示；
+                            // 仅网易云源缓存可补拉（yrc 是网易专属字段；其他源的 SongId 不能用于网易云请求）
                             if (string.IsNullOrEmpty(cached.WordLrc)
+                                && cached.Source == "netease"
                                 && !string.IsNullOrEmpty(cached.SongId)
                                 && _providers.FirstOrDefault(p => p.Id == "netease") is { } yrcProvider)
                             {
@@ -240,6 +241,7 @@ public sealed partial class LyricsOrchestrator
                 }
             }
         }
+        Log.Info($"cache miss: {key} ({t.Artist}|{t.Title} dur={t.DurationMs}ms)");
 
         // 2. 手动校正指定的歌词
         if (ov is { SongId.Length: > 0, Provider.Length: > 0 })
@@ -282,15 +284,19 @@ public sealed partial class LyricsOrchestrator
 
             foreach (var song in found)
                 candidates.Add((provider, song, LyricsMatcher.Score(t, song)));
+            Log.Info($"search {provider.Id}: {found.Count} hits for '{LyricsMatcher.BuildKeyword(t)}'");
 
             // 第一源已有高置信度命中，省掉第二源的请求
             if (i == 0 && candidates.Any(c => c.Score >= LyricsMatcher.EarlyAcceptThreshold))
                 break;
         }
 
+        // 优先尝试网易云候选（唯一带逐字歌词的源）：同合格线内 netease 排最前，防其他源以更高 score 抢走；
+        // 拉取失败仍会继续尝试后续源兜底
         foreach (var c in candidates
                      .Where(c => c.Score >= LyricsMatcher.AcceptThreshold)
-                     .OrderByDescending(c => c.Score)
+                     .OrderByDescending(c => c.Provider.Id == "netease" ? 1 : 0)
+                     .ThenByDescending(c => c.Score)
                      .Take(3))
         {
             ct.ThrowIfCancellationRequested();
@@ -302,7 +308,7 @@ public sealed partial class LyricsOrchestrator
                 continue;
 
             await _cache.SetAsync(key, CachedLyric.Positive(c.Provider.Id, c.Song.SongId, raw)).ConfigureAwait(false);
-            Log.Info($"matched [{c.Provider.Id}] {c.Song.Artist} - {c.Song.Title} score={c.Score:F2}");
+            Log.Info($"matched [{c.Provider.Id}] {c.Song.Artist} - {c.Song.Title} score={c.Score:F2} id={c.Song.SongId}");
             return (doc, songOffset);
         }
 

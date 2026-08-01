@@ -15,13 +15,16 @@ public sealed class OverlayViewModel : ObservableObject
     [
         nameof(MainText), nameof(TransText), nameof(ShowTransLine),
         nameof(FontFamilyValue), nameof(MainFontSize), nameof(EffectiveTransFontSize), nameof(WeightValue),
-        nameof(Fill), nameof(InactiveFill), nameof(TextOpacity), nameof(MaxTextWidth), nameof(TextEffect), nameof(GlowEffect),
+        nameof(Fill), nameof(InactiveFill), nameof(ActiveLayerInactiveFill), nameof(TextOpacity), nameof(MaxTextWidth), nameof(TextEffect), nameof(GlowEffect),
         nameof(WindowVisible), nameof(IsPlaying), nameof(Phase),
         nameof(StrokeEnabled), nameof(StrokeBrush), nameof(StrokeThickness), nameof(LineSpacing),
         nameof(TextAlignment), nameof(GlowEnabled),
+        nameof(InactiveStrokeEnabled), nameof(InactiveStrokeBrush), nameof(InactiveStrokeThickness), nameof(InactiveGlowEffect),
         nameof(CoverImage), nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverSizePct),
         nameof(WordHighlightLength),
     ];
+
+    private static readonly IBrush TransparentBrush = new SolidColorBrush(Colors.Transparent);
 
     private readonly SettingsService _settings;
     private readonly LyricsOrchestrator _orchestrator;
@@ -31,12 +34,16 @@ public sealed class OverlayViewModel : ObservableObject
     private IBrush _fillCache = Brushes.White;
     private string _inactiveHexCache = "";
     private IBrush _inactiveFillCache = Brushes.White;
+    private string _inactiveStrokeHexCache = "";
+    private IBrush _inactiveStrokeBrushCache = Brushes.Black;
     private string _strokeHexCache = "";
     private IBrush _strokeBrushCache = Brushes.Black;
     private string _shadowKeyCache = "";
     private IEffect? _shadowCache;
     private string _glowKeyCache = "";
     private IEffect? _glowCache;
+    private string _inactiveGlowKeyCache = "";
+    private IEffect? _inactiveGlowCache;
 
     public OverlayViewModel(SettingsService settings, LyricsOrchestrator orchestrator, SmtcService smtc)
     {
@@ -223,19 +230,75 @@ public sealed class OverlayViewModel : ObservableObject
         }
     }
 
-    /// <summary>逐字未唱段颜色：主色降低不透明度（变暗），区分已唱段。</summary>
+    /// <summary>逐字未唱段颜色：独立设置时用指定色；否则主色。最终 alpha = 颜色 alpha × 未唱不透明度比例。</summary>
     public IBrush InactiveFill
     {
         get
         {
-            if (_inactiveHexCache != S.ColorHex)
+            var key = $"{(S.InactiveColorHex.Length > 0 ? "I|" + S.InactiveColorHex : "F|" + S.ColorHex)}|{S.InactiveOpacity}";
+            if (_inactiveHexCache != key)
             {
-                _inactiveHexCache = S.ColorHex;
-                _inactiveFillCache = Color.TryParse(S.ColorHex, out var c)
-                    ? new SolidColorBrush(c, 0.45)
-                    : new SolidColorBrush(Colors.White, 0.45);
+                _inactiveHexCache = key;
+                var c = Color.TryParse(S.InactiveColorHex, out var ic)
+                    ? ic
+                    : Color.TryParse(S.ColorHex, out var mc) ? mc : Colors.White;
+                var pct = Math.Clamp(S.InactiveOpacity, 0.05, 1.0);
+                _inactiveFillCache = new SolidColorBrush(Color.FromArgb(
+                    (byte)Math.Round(c.A * pct), c.R, c.G, c.B));
             }
             return _inactiveFillCache;
+        }
+    }
+
+    /// <summary>已唱层未唱段填充：完全透明（只让已唱段字形上色，未唱段由下层负责）。</summary>
+    public IBrush ActiveLayerInactiveFill => TransparentBrush;
+
+    /// <summary>未唱段描边开关（默认关：未唱段不描边，逐字明暗对比不被抹平）。</summary>
+    public bool InactiveStrokeEnabled => S.InactiveStrokeEnabled;
+
+    /// <summary>未唱段描边宽度（独立于已唱段）。</summary>
+    public double InactiveStrokeThickness => Math.Clamp(S.InactiveStrokeThickness, 0.1, 4);
+
+    public bool InactiveGlowEnabled => S.InactiveGlowEnabled;
+
+    /// <summary>未唱段描边画笔（已唱段描边沿用 StrokeBrush）。</summary>
+    public IBrush InactiveStrokeBrush
+    {
+        get
+        {
+            if (_inactiveStrokeHexCache != S.InactiveStrokeColorHex)
+            {
+                _inactiveStrokeHexCache = S.InactiveStrokeColorHex;
+                _inactiveStrokeBrushCache = Color.TryParse(S.InactiveStrokeColorHex, out var c)
+                    ? new SolidColorBrush(c)
+                    : Brushes.Black;
+            }
+            return _inactiveStrokeBrushCache;
+        }
+    }
+
+    /// <summary>未唱段辉光：独立于已唱段辉光（颜色/强度均可独立设置，默认关）。</summary>
+    public IEffect? InactiveGlowEffect
+    {
+        get
+        {
+            if (!S.InactiveGlowEnabled)
+                return null;
+            var key = $"{S.InactiveGlowColorHex}|{S.InactiveGlowRadius}";
+            if (_inactiveGlowKeyCache != key)
+            {
+                _inactiveGlowKeyCache = key;
+                var color = Color.TryParse(S.InactiveGlowColorHex, out var c) ? c : Colors.White;
+                _inactiveGlowCache = new DropShadowEffect
+                {
+                    OffsetX = 0,
+                    OffsetY = 0,
+                    BlurRadius = Math.Clamp(S.InactiveGlowRadius, 4, 60),
+                    Opacity = 0.85,
+                    Color = color,
+                };
+            }
+            return _inactiveGlowCache;
         }
     }
 
@@ -313,7 +376,7 @@ public sealed class OverlayViewModel : ObservableObject
         }
     }
 
-    public double StrokeThickness => Math.Clamp(S.StrokeThickness, 1, 8);
+    public double StrokeThickness => Math.Clamp(S.StrokeThickness, 0.1, 4);
 
     public bool WindowVisible
     {

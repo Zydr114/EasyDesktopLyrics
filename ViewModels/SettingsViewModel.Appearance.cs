@@ -127,9 +127,123 @@ public sealed partial class SettingsViewModel
         get => _settings.Current.StrokeThickness;
         set
         {
-            var v = Math.Round(value);
-            if (Math.Abs(v - _settings.Current.StrokeThickness) < 0.5) return;
+            var v = Math.Round(value, 1);
+            if (Math.Abs(v - _settings.Current.StrokeThickness) < 0.05) return;
             _settings.Update(s => s.StrokeThickness = v);
+        }
+    }
+
+    // ---------- 未唱段（逐字模式未演唱部分）独立样式 ----------
+
+    /// <summary>独立设置未唱颜色；关闭 = 跟随主色（主色 45% 透明）。</summary>
+    public bool InactiveColorIndependent
+    {
+        get => _settings.Current.InactiveColorHex.Length > 0;
+        set
+        {
+            if (value == InactiveColorIndependent) return;
+            _settings.Update(s => s.InactiveColorHex = value ? DefaultInactiveHex() : "");
+        }
+    }
+
+    public Color InactiveColorValue
+    {
+        get
+        {
+            if (Color.TryParse(_settings.Current.InactiveColorHex, out var c))
+                return c;
+            var main = Color.TryParse(_settings.Current.ColorHex, out var m) ? m : Colors.White;
+            return new SolidColorBrush(main, 0.45).Color;
+        }
+        set
+        {
+            var hex = value.ToString().ToUpperInvariant();
+            if (hex == _settings.Current.InactiveColorHex) return;
+            _settings.Update(s => s.InactiveColorHex = hex);
+            Raise(nameof(InactiveColorIndependent));
+        }
+    }
+
+    /// <summary>跟随主色时的未唱颜色：主色 45% 透明（与旧行为一致）。</summary>
+    private string DefaultInactiveHex()
+    {
+        var main = Color.TryParse(_settings.Current.ColorHex, out var c) ? c : Colors.White;
+        return new SolidColorBrush(main, 0.45).Color.ToString().ToUpperInvariant();
+    }
+
+    /// <summary>未唱段不透明度比例（相对全局透明度；1.0 = 与已唱段相同亮度）。</summary>
+    public double InactiveOpacityVal
+    {
+        get => _settings.Current.InactiveOpacity;
+        set
+        {
+            var v = Math.Round(value, 2);
+            if (Math.Abs(v - _settings.Current.InactiveOpacity) < 0.01) return;
+            _settings.Update(s => s.InactiveOpacity = v);
+        }
+    }
+
+    public bool InactiveStrokeEnabled
+    {
+        get => _settings.Current.InactiveStrokeEnabled;
+        set
+        {
+            if (value == _settings.Current.InactiveStrokeEnabled) return;
+            _settings.Update(s => s.InactiveStrokeEnabled = value);
+        }
+    }
+
+    public Color InactiveStrokeColorValue
+    {
+        get => Color.TryParse(_settings.Current.InactiveStrokeColorHex, out var c) ? c : Colors.Black;
+        set
+        {
+            var hex = value.ToString().ToUpperInvariant();
+            if (hex == _settings.Current.InactiveStrokeColorHex) return;
+            _settings.Update(s => s.InactiveStrokeColorHex = hex);
+        }
+    }
+
+    public double InactiveStrokeThicknessVal
+    {
+        get => _settings.Current.InactiveStrokeThickness;
+        set
+        {
+            var v = Math.Round(value, 1);
+            if (Math.Abs(v - _settings.Current.InactiveStrokeThickness) < 0.05) return;
+            _settings.Update(s => s.InactiveStrokeThickness = v);
+        }
+    }
+
+    public bool InactiveGlowEnabled
+    {
+        get => _settings.Current.InactiveGlowEnabled;
+        set
+        {
+            if (value == _settings.Current.InactiveGlowEnabled) return;
+            _settings.Update(s => s.InactiveGlowEnabled = value);
+        }
+    }
+
+    public Color InactiveGlowColorValue
+    {
+        get => Color.TryParse(_settings.Current.InactiveGlowColorHex, out var c) ? c : Colors.White;
+        set
+        {
+            var hex = value.ToString().ToUpperInvariant();
+            if (hex == _settings.Current.InactiveGlowColorHex) return;
+            _settings.Update(s => s.InactiveGlowColorHex = hex);
+        }
+    }
+
+    public double InactiveGlowRadiusVal
+    {
+        get => _settings.Current.InactiveGlowRadius;
+        set
+        {
+            var v = Math.Round(value);
+            if (Math.Abs(v - _settings.Current.InactiveGlowRadius) < 0.5) return;
+            _settings.Update(s => s.InactiveGlowRadius = v);
         }
     }
 

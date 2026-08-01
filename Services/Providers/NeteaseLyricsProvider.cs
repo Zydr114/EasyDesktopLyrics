@@ -21,11 +21,30 @@ public sealed class NeteaseLyricsProvider : ILyricsProvider
     {
         var list = new List<ProviderSong>();
 
-        var url = $"https://music.163.com/api/search/get/web?s={Uri.EscapeDataString(keyword)}&type=1&offset=0&limit=10";
-        using (var doc = await HttpHelper.GetJsonAsync(url, Referer, ct).ConfigureAwait(false))
+        // 网易云搜索接口间歇性返回空结果/异常（与 yrc 同源问题，实测）：主端点重试一轮
+        for (var attempt = 0; attempt < 2 && list.Count == 0; attempt++)
         {
-            if (doc != null)
-                ParseSongs(doc.RootElement.Get("result").Get("songs"), list);
+            if (attempt > 0)
+            {
+                try { await Task.Delay(1000, ct).ConfigureAwait(false); }
+                catch (OperationCanceledException) { throw; }
+            }
+            try
+            {
+                var url = $"https://music.163.com/api/search/get/web?s={Uri.EscapeDataString(keyword)}&type=1&offset=0&limit=10";
+                using var doc = await HttpHelper.GetJsonAsync(url, Referer, ct).ConfigureAwait(false);
+                if (doc != null)
+                    ParseSongs(doc.RootElement.Get("result").Get("songs"), list);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                if (attempt == 0)
+                    Log.Error("netease search failed", ex);
+            }
         }
 
         if (list.Count == 0)

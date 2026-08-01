@@ -53,6 +53,14 @@ public sealed class LyricText : Control
     public static readonly StyledProperty<double> StrokeThicknessProperty =
         AvaloniaProperty.Register<LyricText, double>(nameof(StrokeThickness), 0);
 
+    /// <summary>未唱段描边开关（逐字模式；false 时未唱段描边透明，避免整行描边抹平明暗差）。</summary>
+    public static readonly StyledProperty<bool> InactiveStrokeEnabledProperty =
+        AvaloniaProperty.Register<LyricText, bool>(nameof(InactiveStrokeEnabled), false);
+
+    /// <summary>未唱段描边画笔（逐字模式）。</summary>
+    public static readonly StyledProperty<IBrush?> InactiveStrokeBrushProperty =
+        AvaloniaProperty.Register<LyricText, IBrush?>(nameof(InactiveStrokeBrush));
+
     public static readonly StyledProperty<double> MaxTextWidthProperty =
         AvaloniaProperty.Register<LyricText, double>(nameof(MaxTextWidth), double.PositiveInfinity);
 
@@ -71,7 +79,7 @@ public sealed class LyricText : Control
         AffectsRender<LyricText>(
             TextProperty, FontFamilyProperty, FontWeightProperty, FontSizeProperty,
             FillProperty, InactiveFillProperty, StrokeBrushProperty, StrokeEnabledProperty,
-            StrokeThicknessProperty,
+            StrokeThicknessProperty, InactiveStrokeEnabledProperty, InactiveStrokeBrushProperty,
             TextAlignmentProperty, HighlightLengthProperty, MaxTextWidthProperty);
     }
 
@@ -133,6 +141,18 @@ public sealed class LyricText : Control
     {
         get => GetValue(StrokeThicknessProperty);
         set => SetValue(StrokeThicknessProperty, value);
+    }
+
+    public bool InactiveStrokeEnabled
+    {
+        get => GetValue(InactiveStrokeEnabledProperty);
+        set => SetValue(InactiveStrokeEnabledProperty, value);
+    }
+
+    public IBrush? InactiveStrokeBrush
+    {
+        get => GetValue(InactiveStrokeBrushProperty);
+        set => SetValue(InactiveStrokeBrushProperty, value);
     }
 
     public double MaxTextWidth
@@ -202,12 +222,9 @@ public sealed class LyricText : Control
         var maxWidth = double.PositiveInfinity;
         var maxHeight = double.PositiveInfinity;
 
-        _strokeLayout = StrokeEnabled && StrokeThickness > 0 && StrokeBrush != null
-            ? CreateLayout(text, typeface, StrokeBrush, alignment, wrapping, maxWidth, maxHeight, null)
-            : null;
-
         var h = HighlightLength;
         var len = text.Length;
+        // 逐字模式下的分段样式；整行单色（h<0 或 h>=len）时为 null
         IReadOnlyList<ValueSpan<TextRunProperties>>? styles = null;
         if (h >= 0 && h < len && Fill != null && InactiveFill != null)
         {
@@ -216,6 +233,29 @@ public sealed class LyricText : Control
                    new ValueSpan<TextRunProperties>(h, len - h, RunProps(typeface, FontSize, InactiveFill))]
                 : [new ValueSpan<TextRunProperties>(0, len, RunProps(typeface, FontSize, InactiveFill))];
         }
+
+        // 描边：与正文同分段——已唱段用 StrokeBrush，未唱段用 InactiveStrokeBrush
+        // （未唱描边关闭时未唱段描边透明，避免整行描边抹平逐字明暗差）
+        var strokeStyles = styles;
+        if (strokeStyles != null && (!InactiveStrokeEnabled || InactiveStrokeBrush == null))
+        {
+            var inactiveStroke = Brushes.Transparent;
+            strokeStyles = h > 0
+                ? [new ValueSpan<TextRunProperties>(0, h, RunProps(typeface, FontSize, StrokeBrush)),
+                   new ValueSpan<TextRunProperties>(h, len - h, RunProps(typeface, FontSize, inactiveStroke))]
+                : [new ValueSpan<TextRunProperties>(0, len, RunProps(typeface, FontSize, inactiveStroke))];
+        }
+        else if (strokeStyles != null)
+        {
+            strokeStyles = h > 0
+                ? [new ValueSpan<TextRunProperties>(0, h, RunProps(typeface, FontSize, StrokeBrush)),
+                   new ValueSpan<TextRunProperties>(h, len - h, RunProps(typeface, FontSize, InactiveStrokeBrush))]
+                : [new ValueSpan<TextRunProperties>(0, len, RunProps(typeface, FontSize, InactiveStrokeBrush))];
+        }
+
+        _strokeLayout = StrokeEnabled && StrokeThickness > 0 && StrokeBrush != null
+            ? CreateLayout(text, typeface, StrokeBrush, alignment, wrapping, maxWidth, maxHeight, strokeStyles)
+            : null;
 
         _bodyLayout = CreateLayout(text, typeface, Fill, alignment, wrapping, maxWidth, maxHeight, styles);
     }

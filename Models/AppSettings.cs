@@ -11,6 +11,10 @@ public sealed class AppSettings
     /// <summary>100–900，常用 400/500/600/700。</summary>
     public int FontWeight { get; set; } = 600;
     public string ColorHex { get; set; } = "#FFFFFF";
+    /// <summary>未唱段颜色（逐字模式未演唱部分）；空 = 跟随主色。</summary>
+    public string InactiveColorHex { get; set; } = "";
+    /// <summary>未唱段不透明度比例（相对全局透明度；1.0 = 与已唱段相同亮度）。</summary>
+    public double InactiveOpacity { get; set; } = 0.45;
     public bool ShadowEnabled { get; set; } = true;
     public string ShadowColorHex { get; set; } = "#000000";
     public double ShadowBlurRadius { get; set; } = 8;
@@ -18,10 +22,20 @@ public sealed class AppSettings
     public bool StrokeEnabled { get; set; }
     public string StrokeColorHex { get; set; } = "#000000";
     public double StrokeThickness { get; set; } = 2;
+    /// <summary>未唱段描边开关（默认关：未唱段不描边，避免整行描边覆盖逐字明暗对比）。</summary>
+    public bool InactiveStrokeEnabled { get; set; }
+    public string InactiveStrokeColorHex { get; set; } = "#000000";
+    /// <summary>未唱段描边宽度（独立于已唱段）。</summary>
+    public double InactiveStrokeThickness { get; set; } = 2;
     /// <summary>辉光（软光晕）：大模糊半径的彩色阴影，与硬边描边互补。</summary>
     public bool GlowEnabled { get; set; }
     public string GlowColorHex { get; set; } = "#FFFFFF";
     public double GlowRadius { get; set; } = 14;
+    /// <summary>未唱段辉光开关（默认关：光晕只照亮已唱段）。</summary>
+    public bool InactiveGlowEnabled { get; set; }
+    public string InactiveGlowColorHex { get; set; } = "#FFFFFF";
+    /// <summary>未唱段辉光强度（与已唱段辉光独立）。</summary>
+    public double InactiveGlowRadius { get; set; } = 14;
     /// <summary>翻译行字号，=0 时自动取正文字号的 0.6 倍。</summary>
     public double TransFontSize { get; set; }
     /// <summary>两行歌词间距（DIP）。</summary>
