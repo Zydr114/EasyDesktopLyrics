@@ -667,6 +667,8 @@ public sealed partial class LyricsOverlayWindow : Window
         UpdatePlayPauseIcon();
         ApplyAnchor();
         UpdateVisibility();
+        LogSizeDiagnostics();
+        ScheduleSizeDiagnostics();
     }
 
     protected override void OnClosing(WindowClosingEventArgs e)
@@ -698,6 +700,45 @@ public sealed partial class LyricsOverlayWindow : Window
     {
         if (!_suppressPositionUpdate && ClientSize.Width > 0 && ClientSize.Height > 0)
             RepositionToAnchor();
+        LogSizeDiagnostics();
+    }
+
+    private DateTimeOffset _lastSizeDiag = DateTimeOffset.MinValue;
+
+    /// <summary>
+    /// 尺寸诊断（节流 1s）：对比 DIP 期望物理尺寸与窗口实际物理尺寸，
+    /// 验证 2K 高分屏下 SizeToContent 物理换算是否正确（客户区 = ClientSize × 缩放？）。
+    /// RenderScaling = 窗口实际渲染缩放，若与屏幕缩放不一致即为 DPI 换算错误的直接证据。
+    /// </summary>
+    private void LogSizeDiagnostics()
+    {
+        if (DateTimeOffset.UtcNow - _lastSizeDiag < TimeSpan.FromSeconds(1))
+            return;
+        _lastSizeDiag = DateTimeOffset.UtcNow;
+        if (ClientSize.Width <= 0)
+            return;
+        var screenScale = Screens.ScreenFromWindow(this)?.Scaling ?? 1.0;
+        var renderScale = RenderScaling;
+        var expectByScreen = (ClientSize.Width * screenScale, ClientSize.Height * screenScale);
+        var expectByRender = (ClientSize.Width * renderScale, ClientSize.Height * renderScale);
+        var win = Win32.GetWindowSize(_hwnd);
+        var client = Win32.GetClientSize(_hwnd);
+        Log.Info($"diag: client={ClientSize.Width:F1}x{ClientSize.Height:F1} " +
+                 $"screenScale={screenScale:F3} renderScale={renderScale:F3} " +
+                 $"expectByScreen={expectByScreen.Item1:F0}x{expectByScreen.Item2:F0} " +
+                 $"expectByRender={expectByRender.Item1:F0}x{expectByRender.Item2:F0} " +
+                 $"winPhys={win.W}x{win.H} err={win.Err} clientPhys={client.W}x{client.H} err={client.Err} " +
+                 $"minW={MinWidth:F0} maxW={(double.IsPositiveInfinity(MaxWidth) ? -1 : MaxWidth):F0}");
+    }
+
+    /// <summary>窗口首次布局完成后再采集一次尺寸诊断（OnOpened 时 SizeToContent 可能未完成）。</summary>
+    private void ScheduleSizeDiagnostics()
+    {
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(800);
+            Dispatcher.UIThread.Post(LogSizeDiagnostics);
+        });
     }
 
     /// <summary>按下即拖动（控制条区域除外，避免与按钮点击冲突）；锁定状态下禁止拖动。</summary>

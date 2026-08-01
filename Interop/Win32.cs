@@ -19,6 +19,21 @@ internal static class Win32
     [DllImport("user32.dll")]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint uFlags);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetWindowRect(IntPtr hWnd, out Rect lpRect);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool GetClientRect(IntPtr hWnd, out Rect lpRect);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
     [DllImport("user32.dll", EntryPoint = "GetWindowLong")]
     private static extern int GetWindowLong32(IntPtr hWnd, int nIndex);
 
@@ -30,6 +45,22 @@ internal static class Win32
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr")]
     private static extern nint SetWindowLongPtr64(IntPtr hWnd, int nIndex, nint dwNewLong);
+
+    /// <summary>物理窗口矩形（GetWindowRect，像素）；失败返回 (0,0,err)。</summary>
+    public static (int W, int H, int Err) GetWindowSize(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return (0, 0, 0);
+        if (!GetWindowRect(hwnd, out var r)) return (0, 0, Marshal.GetLastWin32Error());
+        return (r.Right - r.Left, r.Bottom - r.Top, 0);
+    }
+
+    /// <summary>物理客户区矩形（GetClientRect，像素）；失败返回 (0,0,err)。</summary>
+    public static (int W, int H, int Err) GetClientSize(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return (0, 0, 0);
+        if (!GetClientRect(hwnd, out var r)) return (0, 0, Marshal.GetLastWin32Error());
+        return (r.Right - r.Left, r.Bottom - r.Top, 0);
+    }
 
     /// <summary>低频重申置顶，防止被其他置顶窗口覆盖。</summary>
     public static void AssertTopmost(IntPtr hwnd)
