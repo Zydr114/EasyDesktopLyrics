@@ -554,10 +554,17 @@ public sealed partial class LyricsOverlayWindow : Window
         if (!_vm.CoverTitleEnabled)
             return;
         CoverTitleBox.IsVisible = true;
-        var (dx, dy) = CoverTitleSlideOffset();
-        UpdateCoverTitlePosition(dx, dy); // 起始位置 = 最终位置 + 方向偏移
+        // 起始位置延迟到本轮布局完成后设置：此时 Bounds.Width 已就绪，
+        // 起始 x 与终点 x 一致 → 过渡期间仅方向轴移动（垂直/水平滑入，无斜向）
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (!_coverAnimating)
+                return;
+            var (dx, dy) = CoverTitleSlideOffset();
+            UpdateCoverTitlePosition(dx, dy); // 起始位置 = 最终位置 + 方向偏移
+            _coverPosDirty = true;            // 下一轮布局校正到最终位置（平滑滑入）
+        });
         CoverTitleBox.Opacity = 1;
-        _coverPosDirty = true; // 首轮布局后校正到最终位置（RenderTransform 过渡平滑滑入）
     }
 
     /// <summary>歌名淡出（400ms）并沿淡入反方向滑出；快速切歌时跳过，避免误关新歌名。</summary>
