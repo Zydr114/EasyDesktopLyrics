@@ -38,6 +38,7 @@ public sealed partial class LyricsOverlayWindow : Window
     private bool _coverAnimating;
     private double _coverAnimSize;
     private DateTimeOffset _coverAnimStart;
+    private bool _coverTitleEnterPending;
     private bool _coverPosDirty;
     private bool _firstSizeApplied;
     private int _lastGrowBottom;
@@ -104,7 +105,19 @@ public sealed partial class LyricsOverlayWindow : Window
         LayoutUpdated += (_, _) =>
         {
             SyncWindowHeight();
-            // 歌名在首轮布局后按实测宽度定位（封面下方），之后不再跟随封面动画路径
+            // 歌名进入：布局完成后（Bounds 就绪）瞬移起始位置（临时禁过渡）→ 淡入
+            if (_coverAnimating && _coverTitleEnterPending)
+            {
+                _coverTitleEnterPending = false;
+                var saved = CoverTitleBox.Transitions;
+                CoverTitleBox.Transitions = null;
+                var (dx, dy) = CoverTitleSlideOffset();
+                UpdateCoverTitlePosition(dx, dy);
+                CoverTitleBox.Transitions = saved;
+                CoverTitleBox.Opacity = 1;
+                _coverPosDirty = true;
+            }
+            // 校正到最终位置：从起始位置沿方向轴平滑滑入（x 恒定，无斜向）
             if (_coverAnimating && _coverPosDirty)
             {
                 _coverPosDirty = false;
@@ -548,23 +561,17 @@ public sealed partial class LyricsOverlayWindow : Window
         }
     }
 
-    /// <summary>歌名进入布局（仅动画期间调用）：从"方向"对应偏移处滑入并淡入；开关关闭时不进入。</summary>
+    /// <summary>
+    /// 歌名进入布局（仅动画期间调用）：先不可见地进入布局（保持 Opacity=0），
+    /// 等布局完成后（Bounds 就绪）在同一轮内完成：瞬移起始位置（无过渡）→ 淡入 → 滑向最终位置。
+    /// 避免"旧位置先可见再被拖动"的跳变。开关关闭时不进入。
+    /// </summary>
     private void EnterCoverTitle()
     {
         if (!_vm.CoverTitleEnabled)
             return;
-        CoverTitleBox.IsVisible = true;
-        // 起始位置延迟到本轮布局完成后设置：此时 Bounds.Width 已就绪，
-        // 起始 x 与终点 x 一致 → 过渡期间仅方向轴移动（垂直/水平滑入，无斜向）
-        Dispatcher.UIThread.Post(() =>
-        {
-            if (!_coverAnimating)
-                return;
-            var (dx, dy) = CoverTitleSlideOffset();
-            UpdateCoverTitlePosition(dx, dy); // 起始位置 = 最终位置 + 方向偏移
-            _coverPosDirty = true;            // 下一轮布局校正到最终位置（平滑滑入）
-        });
-        CoverTitleBox.Opacity = 1;
+        CoverTitleBox.IsVisible = true; // Opacity 保持 0：布局完成前不可见
+        _coverTitleEnterPending = true;
     }
 
     /// <summary>歌名淡出（400ms）并沿淡入反方向滑出；快速切歌时跳过，避免误关新歌名。</summary>
