@@ -56,10 +56,10 @@
               </Transitions>
             </Image.Transitions>
           </Image>
-          <!-- 歌名/歌手元素：整体淡入淡出；行布局由代码按位置模式切换 -->
+          <!-- 歌名/歌手元素：仅切歌动画期间进入布局（IsVisible 由代码控制），整体淡入淡出 -->
           <Viewbox x:Name="CoverTitleBox" MaxWidth="{Binding MaxTextWidth}" StretchDirection="DownOnly"
                    HorizontalAlignment="Center" VerticalAlignment="Center"
-                   IsVisible="{Binding CoverTitleEnabled}" Opacity="0">
+                   IsVisible="False" Opacity="0">
             <Viewbox.Transitions>
               <Transitions>
                 <DoubleTransition Property="Opacity" Duration="0:0:0.25" Easing="QuadraticEaseOut" />
