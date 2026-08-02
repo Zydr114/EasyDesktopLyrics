@@ -92,6 +92,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverSizePctVal),
         nameof(CoverAnimMinSec), nameof(CoverAnimMaxSec),
         nameof(CoverTitleEnabled), nameof(CoverTitleShowArtist), nameof(CoverTitleAnimDirectionIndex),
+        nameof(CoverTitleSlideDistanceVal),
         nameof(CoverTitleFont), nameof(CoverTitleColorValue), nameof(CoverTitleFontSizeVal),
         nameof(CoverTitleOpacityVal), nameof(CoverTitleStrokeEnabled),
         nameof(CoverTitleStrokeColorValue), nameof(CoverTitleStrokeThicknessVal),

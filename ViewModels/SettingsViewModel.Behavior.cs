@@ -269,6 +269,18 @@ public sealed partial class SettingsViewModel
         set => _settings.Update(s => s.CoverTitleAnimDirection = Math.Clamp(value, 0, 4));
     }
 
+    /// <summary>歌名滑入/滑出位移强度（px）。</summary>
+    public double CoverTitleSlideDistanceVal
+    {
+        get => _settings.Current.CoverTitleSlideDistance;
+        set
+        {
+            var v = Math.Round(value);
+            if (Math.Abs(v - _settings.Current.CoverTitleSlideDistance) < 0.5) return;
+            _settings.Update(s => s.CoverTitleSlideDistance = v);
+        }
+    }
+
     // ---------- 歌名/歌手阴影 ----------
 
     public bool CoverTitleShadowEnabled

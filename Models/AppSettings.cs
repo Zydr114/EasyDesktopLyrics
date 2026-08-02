@@ -82,6 +82,8 @@ public sealed class AppSettings
     public bool CoverTitleShowArtist { get; set; } = true;
     /// <summary>歌名淡入淡出方向：0=无位移，1=上，2=下，3=左，4=右。</summary>
     public int CoverTitleAnimDirection { get; set; }
+    /// <summary>歌名滑入/滑出位移强度（px）。</summary>
+    public double CoverTitleSlideDistance { get; set; } = 12;
     // 歌名行阴影
     public bool CoverTitleShadowEnabled { get; set; }
     public string CoverTitleShadowColorHex { get; set; } = "#000000";

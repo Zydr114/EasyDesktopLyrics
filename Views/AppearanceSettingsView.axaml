@@ -249,6 +249,14 @@
                 <ComboBox Grid.Column="1" ItemsSource="{Binding CoverTitleAnimDirectionOptions}"
                           SelectedIndex="{Binding CoverTitleAnimDirectionIndex, Mode=TwoWay}" />
               </Grid>
+              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                <TextBlock Classes="sectionLabel" Text="位移强度" />
+                <Slider Grid.Column="1" Minimum="0" Maximum="40" TickFrequency="1"
+                        Value="{Binding CoverTitleSlideDistanceVal, Mode=TwoWay}" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding CoverTitleSlideDistanceVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}px'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+              </Grid>
               <TextBlock Text="歌名与歌手分行显示，位于封面下方，随切歌动画淡入淡出；样式独立可调。" FontSize="11" Opacity="0.6" />
             </StackPanel>
           </Border>

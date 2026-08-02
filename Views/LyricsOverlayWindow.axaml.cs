@@ -597,11 +597,11 @@ public sealed partial class LyricsOverlayWindow : Window
         });
     }
 
-    /// <summary>淡入淡出方向偏移（12px）：1=上，2=下，3=左，4=右，0=无位移。</summary>
+    /// <summary>淡入淡出方向偏移：1=上，2=下，3=左，4=右，0=无位移；强度可配置。</summary>
     private (double dx, double dy) CoverTitleSlideOffset()
     {
         var dir = _vm.CoverTitleAnimDirection;
-        const double d = 12;
+        var d = Math.Clamp(_settingsService.Current.CoverTitleSlideDistance, 0, 60);
         return dir switch
         {
             1 => (0, -d), // 起点在上方（向下滑入）
