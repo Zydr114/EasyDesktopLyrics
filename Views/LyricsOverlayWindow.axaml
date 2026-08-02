@@ -36,8 +36,7 @@
                 VerticalAlignment="Top" />
       </Grid>
 
-      <!-- 封面覆盖层：RenderTransform 定位（常驻位 / 窗口中心）。
-           内含封面 + 可选歌名/歌手（切歌动画时显示，歌名元素整体淡入淡出）。 -->
+      <!-- 封面覆盖层：RenderTransform 定位（常驻位 / 窗口中心）。纯封面图像，圆角完整。 -->
       <Border x:Name="Cover" HorizontalAlignment="Left" VerticalAlignment="Top"
               CornerRadius="8" ClipToBounds="True"
               IsHitTestVisible="False" Opacity="0">
@@ -47,46 +46,47 @@
             <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.45" Easing="QuadraticEaseOut" />
           </Transitions>
         </Border.Transitions>
-        <Grid x:Name="CoverGrid">
-          <Image x:Name="CoverImage" Stretch="UniformToFill" VerticalAlignment="Top">
-            <Image.Transitions>
-              <Transitions>
-                <DoubleTransition Property="Width" Duration="0:0:0.45" Easing="QuadraticEaseOut" />
-                <DoubleTransition Property="Height" Duration="0:0:0.45" Easing="QuadraticEaseOut" />
-              </Transitions>
-            </Image.Transitions>
-          </Image>
-          <!-- 歌名/歌手元素：仅切歌动画期间进入布局（IsVisible 由代码控制），整体淡入淡出 -->
-          <Viewbox x:Name="CoverTitleBox" MaxWidth="{Binding MaxTextWidth}" StretchDirection="DownOnly"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                   IsVisible="False" Opacity="0">
-            <Viewbox.Transitions>
-              <Transitions>
-                <DoubleTransition Property="Opacity" Duration="0:0:0.25" Easing="QuadraticEaseOut" />
-              </Transitions>
-            </Viewbox.Transitions>
-            <StackPanel Spacing="4" HorizontalAlignment="Center">
-              <views:LyricText x:Name="CoverTitleText" Text="{Binding CoverTitle}"
-                               FontFamily="{Binding CoverTitleFontFamily}"
-                               FontSize="{Binding CoverTitleFontSize}"
-                               Fill="{Binding CoverTitleColor}"
-                               Opacity="{Binding CoverTitleOpacity}"
-                               StrokeEnabled="{Binding CoverTitleStrokeEnabled}"
-                               StrokeBrush="{Binding CoverTitleStrokeBrush}"
-                               StrokeThickness="{Binding CoverTitleStrokeThickness}" />
-              <views:LyricText x:Name="CoverArtistText" Text="{Binding CoverArtist}"
-                               FontFamily="{Binding CoverArtistFontFamily}"
-                               FontSize="{Binding CoverArtistFontSize}"
-                               Fill="{Binding CoverArtistColor}"
-                               Opacity="{Binding CoverArtistOpacity}"
-                               StrokeEnabled="{Binding CoverArtistStrokeEnabled}"
-                               StrokeBrush="{Binding CoverArtistStrokeBrush}"
-                               StrokeThickness="{Binding CoverArtistStrokeThickness}"
-                               IsVisible="{Binding CoverTitleShowArtist}" />
-            </StackPanel>
-          </Viewbox>
-        </Grid>
+        <Image x:Name="CoverImage" Stretch="UniformToFill">
+          <Image.Transitions>
+            <Transitions>
+              <DoubleTransition Property="Width" Duration="0:0:0.45" Easing="QuadraticEaseOut" />
+              <DoubleTransition Property="Height" Duration="0:0:0.45" Easing="QuadraticEaseOut" />
+            </Transitions>
+          </Image.Transitions>
+        </Image>
       </Border>
+
+      <!-- 歌名/歌手独立覆盖层：切歌动画期间在封面下方显示，淡入淡出、不跟随封面动画路径 -->
+      <Viewbox x:Name="CoverTitleBox" MaxWidth="{Binding MaxTextWidth}" StretchDirection="DownOnly"
+               HorizontalAlignment="Left" VerticalAlignment="Top"
+               IsHitTestVisible="False" IsVisible="False" Opacity="0">
+        <Viewbox.Transitions>
+          <Transitions>
+            <DoubleTransition Property="Opacity" Duration="0:0:0.25" Easing="QuadraticEaseOut" />
+          </Transitions>
+        </Viewbox.Transitions>
+        <StackPanel Spacing="4" HorizontalAlignment="Center">
+          <views:LyricText x:Name="CoverTitleText" Text="{Binding CoverTitle}"
+                           HorizontalAlignment="Center"
+                           FontFamily="{Binding CoverTitleFontFamily}"
+                           FontSize="{Binding CoverTitleFontSize}"
+                           Fill="{Binding CoverTitleColor}"
+                           Opacity="{Binding CoverTitleOpacity}"
+                           StrokeEnabled="{Binding CoverTitleStrokeEnabled}"
+                           StrokeBrush="{Binding CoverTitleStrokeBrush}"
+                           StrokeThickness="{Binding CoverTitleStrokeThickness}" />
+          <views:LyricText x:Name="CoverArtistText" Text="{Binding CoverArtist}"
+                           HorizontalAlignment="Center"
+                           FontFamily="{Binding CoverArtistFontFamily}"
+                           FontSize="{Binding CoverArtistFontSize}"
+                           Fill="{Binding CoverArtistColor}"
+                           Opacity="{Binding CoverArtistOpacity}"
+                           StrokeEnabled="{Binding CoverArtistStrokeEnabled}"
+                           StrokeBrush="{Binding CoverArtistStrokeBrush}"
+                           StrokeThickness="{Binding CoverArtistStrokeThickness}"
+                           IsVisible="{Binding CoverTitleShowArtist}" />
+        </StackPanel>
+      </Viewbox>
 
       <!-- 播放控制条：hover 显示，位于所有内容（封面/歌词）下方 -->
       <Border x:Name="ControlBar" Grid.Row="1"

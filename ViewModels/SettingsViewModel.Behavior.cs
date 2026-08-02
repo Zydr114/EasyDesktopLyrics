@@ -259,26 +259,6 @@ public sealed partial class SettingsViewModel
         }
     }
 
-    /// <summary>歌名位置选项：0=上方，1=下方，2=悬浮。</summary>
-    public IReadOnlyList<string> CoverTitlePositionOptions { get; } = ["上方", "下方", "悬浮于封面"];
-
-    public int CoverTitlePositionIndex
-    {
-        get => Math.Clamp(_settings.Current.CoverTitlePosition, 0, 2);
-        set => _settings.Update(s => s.CoverTitlePosition = Math.Clamp(value, 0, 2));
-    }
-
-    public double CoverAnimCoverOpacityVal
-    {
-        get => _settings.Current.CoverAnimCoverOpacity;
-        set
-        {
-            var v = Math.Round(value, 2);
-            if (Math.Abs(v - _settings.Current.CoverAnimCoverOpacity) < 0.01) return;
-            _settings.Update(s => s.CoverAnimCoverOpacity = v);
-        }
-    }
-
     public string CoverTitleFont
     {
         get => _settings.Current.CoverTitleFont;

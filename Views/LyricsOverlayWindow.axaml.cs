@@ -38,7 +38,6 @@ public sealed partial class LyricsOverlayWindow : Window
     private bool _coverAnimating;
     private double _coverAnimSize;
     private DateTimeOffset _coverAnimStart;
-    private bool _coverTitleSizeDirty;
     private bool _coverPosDirty;
     private bool _firstSizeApplied;
     private int _lastGrowBottom;
@@ -105,21 +104,11 @@ public sealed partial class LyricsOverlayWindow : Window
         LayoutUpdated += (_, _) =>
         {
             SyncWindowHeight();
-            // 歌名区高/整体宽在首轮布局后实测：校正封面尺寸与封面水平居中位置
-            // （整体高恒 = 行高×3，窗口高度不受封面尺寸校正影响）
-            if (_coverAnimating)
+            // 歌名在首轮布局后按实测宽度定位（封面下方），之后不再跟随封面动画路径
+            if (_coverAnimating && _coverPosDirty)
             {
-                if (_coverTitleSizeDirty)
-                {
-                    _coverTitleSizeDirty = false;
-                    UpdateCoverImageSize();
-                }
-                if (_coverPosDirty)
-                {
-                    _coverPosDirty = false;
-                    var cx = Math.Max(0, (OuterGrid.Bounds.Width - Cover.Bounds.Width) / 2);
-                    Cover.RenderTransform = Translate(cx, 0);
-                }
+                _coverPosDirty = false;
+                UpdateCoverTitlePosition();
             }
         };
 
@@ -145,7 +134,7 @@ public sealed partial class LyricsOverlayWindow : Window
     }
 
     /// <summary>
-    /// 窗口高度 = 内容布局期望高度（主行 + 翻译行 + spacing + 封面覆盖层 + 控制条 + padding）。
+    /// 窗口高度 = 内容布局期望高度（主行 + 翻译行 + spacing + 封面覆盖层 + 歌名区 + 控制条 + padding）。
     /// 各组件 Bounds 均与窗口高度无关（宽度由 SizeToContent 决定，缩放由此确定）→ 收敛无循环。
     /// </summary>
     private double ContentHeight()
@@ -154,6 +143,9 @@ public sealed partial class LyricsOverlayWindow : Window
         if (_transGrid.Bounds.Height > 0)
             h += _transGrid.Bounds.Height + _vm.LineSpacing;
         h = Math.Max(h, Cover.Bounds.Height);
+        // 动画期间歌名显示在封面下方：窗口容纳封面 + 间距 + 歌名区
+        if (_coverAnimating && CoverTitleBox.IsVisible && CoverTitleBox.Bounds.Height > 0)
+            h = Math.Max(h, Cover.Bounds.Height + 8 + CoverTitleBox.Bounds.Height);
         return h + ControlBar.Height + 12; // 12 = Border padding 6×2
     }
 
@@ -416,13 +408,16 @@ public sealed partial class LyricsOverlayWindow : Window
             ApplyGlow();
         else if (e.PropertyName == nameof(OverlayViewModel.TextAlignment))
             ApplyAlignment();
-        else if (e.PropertyName is nameof(OverlayViewModel.CoverTitlePosition)
-                 or nameof(OverlayViewModel.CoverAnimCoverOpacity))
+        else if (e.PropertyName is nameof(OverlayViewModel.CoverTitleEnabled))
         {
-            // 动画中即时应用；非动画仅恢复单格（下次动画自然采用新设置，常驻布局不受影响）
-            ApplyCoverTitleLayout(active: _coverAnimating);
+            // 动画中切换开关：即时进入/退出歌名
             if (_coverAnimating)
-                _coverPosDirty = true;
+            {
+                if (_vm.CoverTitleEnabled)
+                    EnterCoverTitle();
+                else
+                    ExitCoverTitle();
+            }
         }
     }
 
@@ -478,13 +473,14 @@ public sealed partial class LyricsOverlayWindow : Window
             _coverTimeoutTimer.Interval = TimeSpan.FromMilliseconds(_vm.CoverAnimMaxMs);
             _coverTimeoutTimer.Start();
 
-            // 窗口内叠加：封面放大到行高尺寸、居中于歌词行，淡入掩盖歌词；
-            // 歌名/歌手元素仅动画期间进入布局（行结构/封面尺寸/居中均在校正阶段收敛）
-            EnterCoverTitle();
-            ApplyCoverTitleLayout(active: true);
-            var cx = Math.Max(0, (OuterGrid.Bounds.Width - Math.Max(Cover.Bounds.Width, _coverAnimSize)) / 2);
+            // 窗口内叠加：封面恢复纯 300% 行高正方形、居中于歌词行，淡入掩盖歌词；
+            // 歌名/歌手为独立覆盖层（封面下方），淡入淡出、不跟随封面动画路径
+            CoverImage.Width = _coverAnimSize;
+            CoverImage.Height = _coverAnimSize;
+            var cx = Math.Max(0, (OuterGrid.Bounds.Width - _coverAnimSize) / 2);
             Cover.RenderTransform = Translate(cx, 0);
             Cover.Opacity = 1;
+            EnterCoverTitle();
             _coverPosDirty = true;
             Log.Info($"cover: animation started, winW={ClientSize.Width:F0} size={_coverAnimSize:F0} titleEnabled={_vm.CoverTitleEnabled}");
             return;
@@ -552,19 +548,17 @@ public sealed partial class LyricsOverlayWindow : Window
         }
     }
 
-    /// <summary>
-    /// 歌名进入布局（仅动画期间调用）：设置文本可见并淡入。
-    /// 开关关闭时不进入（IsVisible 保持 false，布局与旧版完全一致）。
-    /// </summary>
+    /// <summary>歌名进入布局（仅动画期间调用）：显示在封面下方并淡入；开关关闭时不进入。</summary>
     private void EnterCoverTitle()
     {
         if (!_vm.CoverTitleEnabled)
             return;
         CoverTitleBox.IsVisible = true;
+        UpdateCoverTitlePosition();
         CoverTitleBox.Opacity = 1;
     }
 
-    /// <summary>歌名淡出并退出布局（恢复单格结构，封面圆角/居中等常驻行为与旧版一致）。</summary>
+    /// <summary>歌名淡出（250ms）后退出布局；快速切歌时跳过，避免误关新歌名。</summary>
     private void ExitCoverTitle()
     {
         CoverTitleBox.Opacity = 0;
@@ -574,11 +568,21 @@ public sealed partial class LyricsOverlayWindow : Window
             Dispatcher.UIThread.Post(() =>
             {
                 if (_coverAnimating)
-                    return; // 新动画已开始：跳过退出，避免误关新歌名
+                    return; // 新动画已开始：跳过退出
                 CoverTitleBox.IsVisible = false;
-                ApplyCoverTitleLayout(active: false);
             });
         });
+    }
+
+    /// <summary>歌名定位：水平居中于窗口（与封面同轴），垂直位于封面下边框下方（不跟随封面动画路径）。</summary>
+    private void UpdateCoverTitlePosition()
+    {
+        if (!CoverTitleBox.IsVisible)
+            return;
+        const double gap = 8;
+        var x = Math.Max(0, (OuterGrid.Bounds.Width - CoverTitleBox.Bounds.Width) / 2);
+        var y = Cover.Bounds.Height + gap;
+        CoverTitleBox.RenderTransform = Translate(x, y);
     }
 
     private void SetLyricsOpacity(double opacity) => LyricsViewbox.Opacity = opacity;
@@ -590,64 +594,6 @@ public sealed partial class LyricsOverlayWindow : Window
         if (h <= 0)
             h = 40;
         return Math.Max(h * 3, _coverSize);
-    }
-
-    /// <summary>
-    /// 歌名元素布局：仅动画期间（active=true）按位置模式设置 CoverGrid 行结构
-    /// （上方=歌名上/封面下，下方=对称，悬浮=同格居中），悬浮模式降低封面不透明度；
-    /// 非动画（active=false）恢复单格结构，封面恒不透明——常驻布局与旧版完全一致。
-    /// </summary>
-    private void ApplyCoverTitleLayout(bool active)
-    {
-        var pos = _vm.CoverTitlePosition;
-        if (active)
-        {
-            if (pos == 0)
-            {
-                CoverGrid.RowDefinitions = new RowDefinitions("Auto,*");
-                Grid.SetRow(CoverTitleBox, 0);
-                Grid.SetRow(CoverImage, 1);
-            }
-            else if (pos == 1)
-            {
-                CoverGrid.RowDefinitions = new RowDefinitions("*,Auto");
-                Grid.SetRow(CoverImage, 0);
-                Grid.SetRow(CoverTitleBox, 1);
-            }
-            else
-            {
-                CoverGrid.RowDefinitions = new RowDefinitions("*");
-                Grid.SetRow(CoverImage, 0);
-                Grid.SetRow(CoverTitleBox, 0);
-            }
-            CoverImage.Opacity = pos == 2 ? _vm.CoverAnimCoverOpacity : 1;
-        }
-        else
-        {
-            // 恢复单格：封面填满 Cover（圆角/居中行为回到纯封面状态）
-            CoverGrid.RowDefinitions = new RowDefinitions("*");
-            Grid.SetRow(CoverImage, 0);
-            Grid.SetRow(CoverTitleBox, 0);
-            CoverImage.Opacity = 1;
-        }
-        _coverTitleSizeDirty = true;
-        UpdateCoverImageSize();
-    }
-
-    /// <summary>封面尺寸：动画中 = 整体高 − 歌名区高（上方/下方）或整体高（悬浮）；非动画 = 常驻尺寸。</summary>
-    private void UpdateCoverImageSize()
-    {
-        if (!_coverAnimating)
-        {
-            CoverImage.Width = _coverSize;
-            CoverImage.Height = _coverSize;
-            return;
-        }
-        var coverH = _vm.CoverTitlePosition == 2
-            ? _coverAnimSize
-            : Math.Max(10, _coverAnimSize - CoverTitleBox.Bounds.Height);
-        CoverImage.Width = coverH;
-        CoverImage.Height = coverH;
     }
 
     /// <summary>常驻位置（CoverSlot 左上角）在外层 Grid 内的坐标（与封面元素同一坐标系）。</summary>

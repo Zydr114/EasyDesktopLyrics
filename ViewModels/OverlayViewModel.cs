@@ -23,8 +23,7 @@ public sealed class OverlayViewModel : ObservableObject
         nameof(CoverImage), nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverSizePct),
         nameof(WordHighlightLength), nameof(WordHighlightFraction),
         nameof(CoverTitle), nameof(CoverArtist),
-        nameof(CoverTitleEnabled), nameof(CoverTitleShowArtist), nameof(CoverTitlePosition),
-        nameof(CoverAnimCoverOpacity),
+        nameof(CoverTitleEnabled), nameof(CoverTitleShowArtist),
         nameof(CoverTitleFontFamily), nameof(CoverTitleColor), nameof(CoverTitleFontSize),
         nameof(CoverTitleOpacity), nameof(CoverTitleStrokeEnabled), nameof(CoverTitleStrokeBrush),
         nameof(CoverTitleStrokeThickness),
@@ -176,11 +175,6 @@ public sealed class OverlayViewModel : ObservableObject
     public bool CoverTitleEnabled => S.CoverTitleEnabled;
 
     public bool CoverTitleShowArtist => S.CoverTitleShowArtist;
-
-    /// <summary>0=上方，1=下方，2=悬浮于封面。</summary>
-    public int CoverTitlePosition => Math.Clamp(S.CoverTitlePosition, 0, 2);
-
-    public double CoverAnimCoverOpacity => Math.Clamp(S.CoverAnimCoverOpacity, 0.1, 1);
 
     public FontFamily CoverTitleFontFamily =>
         ParseFont(S.CoverTitleFont) ?? FontFamilyValue;

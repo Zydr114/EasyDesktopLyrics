@@ -80,10 +80,6 @@ public sealed class AppSettings
     public bool CoverTitleEnabled { get; set; }
     /// <summary>歌名下方同时显示歌手（分行）。</summary>
     public bool CoverTitleShowArtist { get; set; } = true;
-    /// <summary>歌名位置：0=封面上方，1=封面下方，2=悬浮于封面之上。</summary>
-    public int CoverTitlePosition { get; set; }
-    /// <summary>悬浮模式下封面不透明度（0.1–1）。</summary>
-    public double CoverAnimCoverOpacity { get; set; } = 0.35;
     // 歌名行
     public string CoverTitleFont { get; set; } = "Microsoft YaHei UI";
     public string CoverTitleColorHex { get; set; } = "#FFFFFF";

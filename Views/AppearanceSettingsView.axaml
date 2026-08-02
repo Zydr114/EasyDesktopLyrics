@@ -244,20 +244,7 @@
                 <TextBlock Classes="sectionLabel" Text="显示歌手" />
                 <ToggleSwitch Grid.Column="1" IsChecked="{Binding CoverTitleShowArtist, Mode=TwoWay}" />
               </Grid>
-              <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
-                <TextBlock Classes="sectionLabel" Text="位置" />
-                <ComboBox Grid.Column="1" ItemsSource="{Binding CoverTitlePositionOptions}"
-                          SelectedIndex="{Binding CoverTitlePositionIndex, Mode=TwoWay}" />
-              </Grid>
-              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
-                <TextBlock Classes="sectionLabel" Text="悬浮封面不透明度" />
-                <Slider Grid.Column="1" Minimum="0.1" Maximum="1" TickFrequency="0.05"
-                        Value="{Binding CoverAnimCoverOpacityVal, Mode=TwoWay}" />
-                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
-                         Text="{Binding CoverAnimCoverOpacityVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:P0}'}"
-                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
-              </Grid>
-              <TextBlock Text="仅“悬浮于封面”位置模式下生效：降低封面不透明度以突出歌名。" FontSize="11" Opacity="0.6" />
+              <TextBlock Text="歌名与歌手分行显示，位于封面下方，随切歌动画淡入淡出；样式独立可调。" FontSize="11" Opacity="0.6" />
             </StackPanel>
           </Border>
         </StackPanel>
