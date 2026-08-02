@@ -234,6 +234,140 @@
           <TextBox Grid.Column="2" Grid.Row="4" MinHeight="28" Padding="8,2" Text="{Binding CoverAnimMaxSec, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}s'}"
                    TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
         </Grid>
+
+        <!-- 切歌歌名 -->
+        <StackPanel Spacing="6">
+          <CheckBox Content="切歌时显示歌名" IsChecked="{Binding CoverTitleEnabled, Mode=TwoWay}" />
+          <Border IsVisible="{Binding CoverTitleEnabled}" Margin="20,0,0,0">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="显示歌手" />
+                <ToggleSwitch Grid.Column="1" IsChecked="{Binding CoverTitleShowArtist, Mode=TwoWay}" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="位置" />
+                <ComboBox Grid.Column="1" ItemsSource="{Binding CoverTitlePositionOptions}"
+                          SelectedIndex="{Binding CoverTitlePositionIndex, Mode=TwoWay}" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                <TextBlock Classes="sectionLabel" Text="悬浮封面不透明度" />
+                <Slider Grid.Column="1" Minimum="0.1" Maximum="1" TickFrequency="0.05"
+                        Value="{Binding CoverAnimCoverOpacityVal, Mode=TwoWay}" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding CoverAnimCoverOpacityVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:P0}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+              </Grid>
+              <TextBlock Text="仅“悬浮于封面”位置模式下生效：降低封面不透明度以突出歌名。" FontSize="11" Opacity="0.6" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <!-- 歌名样式 -->
+        <StackPanel Spacing="6">
+          <TextBlock Text="歌名样式" FontWeight="SemiBold" FontSize="13" IsVisible="{Binding CoverTitleEnabled}" />
+          <Border IsVisible="{Binding CoverTitleEnabled}" Margin="20,0,0,0">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="字体" />
+                <ComboBox Grid.Column="1" ItemsSource="{Binding FontOptions}"
+                          SelectedItem="{Binding CoverTitleFont, Mode=TwoWay}" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="颜色" />
+                <local:ColorPicker Grid.Column="1" Color="{Binding CoverTitleColorValue, Mode=TwoWay}" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                <TextBlock Classes="sectionLabel" Text="字号" />
+                <Slider Grid.Column="1" Minimum="10" Maximum="60" TickFrequency="1"
+                        Value="{Binding CoverTitleFontSizeVal, Mode=TwoWay}" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding CoverTitleFontSizeVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                <TextBlock Classes="sectionLabel" Text="不透明度" />
+                <Slider Grid.Column="1" Minimum="0.05" Maximum="1" TickFrequency="0.05"
+                        Value="{Binding CoverTitleOpacityVal, Mode=TwoWay}" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding CoverTitleOpacityVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:P0}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+              </Grid>
+              <StackPanel Spacing="6">
+                <CheckBox Content="歌名描边" IsChecked="{Binding CoverTitleStrokeEnabled, Mode=TwoWay}" />
+                <Border IsVisible="{Binding CoverTitleStrokeEnabled}" Margin="16,0,0,0">
+                  <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                      <TextBlock Classes="sectionLabel" Text="描边颜色" />
+                      <local:ColorPicker Grid.Column="1" Color="{Binding CoverTitleStrokeColorValue, Mode=TwoWay}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                      <TextBlock Classes="sectionLabel" Text="描边宽度" />
+                      <Slider Grid.Column="1" Minimum="0.1" Maximum="4" TickFrequency="0.1"
+                              Value="{Binding CoverTitleStrokeThicknessVal, Mode=TwoWay}" />
+                      <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                               Text="{Binding CoverTitleStrokeThicknessVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}'}"
+                               TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+                    </Grid>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <!-- 歌手样式 -->
+        <StackPanel Spacing="6">
+          <TextBlock Text="歌手样式" FontWeight="SemiBold" FontSize="13" IsVisible="{Binding CoverTitleShowArtist}" />
+          <Border IsVisible="{Binding CoverTitleShowArtist}">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="字体" />
+                <ComboBox Grid.Column="1" ItemsSource="{Binding FontOptions}"
+                          SelectedItem="{Binding CoverArtistFont, Mode=TwoWay}" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="颜色" />
+                <local:ColorPicker Grid.Column="1" Color="{Binding CoverArtistColorValue, Mode=TwoWay}" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                <TextBlock Classes="sectionLabel" Text="字号" />
+                <Slider Grid.Column="1" Minimum="10" Maximum="60" TickFrequency="1"
+                        Value="{Binding CoverArtistFontSizeVal, Mode=TwoWay}" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding CoverArtistFontSizeVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                <TextBlock Classes="sectionLabel" Text="不透明度" />
+                <Slider Grid.Column="1" Minimum="0.05" Maximum="1" TickFrequency="0.05"
+                        Value="{Binding CoverArtistOpacityVal, Mode=TwoWay}" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding CoverArtistOpacityVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:P0}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+              </Grid>
+              <StackPanel Spacing="6">
+                <CheckBox Content="歌手描边" IsChecked="{Binding CoverArtistStrokeEnabled, Mode=TwoWay}" />
+                <Border IsVisible="{Binding CoverArtistStrokeEnabled}" Margin="16,0,0,0">
+                  <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                      <TextBlock Classes="sectionLabel" Text="描边颜色" />
+                      <local:ColorPicker Grid.Column="1" Color="{Binding CoverArtistStrokeColorValue, Mode=TwoWay}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                      <TextBlock Classes="sectionLabel" Text="描边宽度" />
+                      <Slider Grid.Column="1" Minimum="0.1" Maximum="4" TickFrequency="0.1"
+                              Value="{Binding CoverArtistStrokeThicknessVal, Mode=TwoWay}" />
+                      <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                               Text="{Binding CoverArtistStrokeThicknessVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}'}"
+                               TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+                    </Grid>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+          <TextBlock Text="歌名与歌手分行显示，样式独立；歌手行随“显示歌手”开关显示。" FontSize="11" Opacity="0.6" />
+        </StackPanel>
       </StackPanel>
     </Border>
 
