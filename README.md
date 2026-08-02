@@ -25,7 +25,7 @@ Windows 桌面歌词工具。通过 [SMTC](https://learn.microsoft.com/windows/u
 
 ## 使用
 
-1. 从 [Release](https://github.com/Zydr114/SimpleDesktopLyrics/releases) 下载压缩包，解压后双击 `EasyDesktopLyrics.exe`。
+1. 从 [Release](https://github.com/Zydr114/EasyDesktopLyrics/releases) 下载压缩包，解压后双击 `EasyDesktopLyrics.exe`。
 2. 打开任意支持的播放器开始播放，歌词窗口自动出现。
 3. 托盘图标 → 锁定歌词（鼠标穿透），歌词即完全悬浮于桌面。
 
@@ -36,7 +36,7 @@ Windows 桌面歌词工具。通过 [SMTC](https://learn.microsoft.com/windows/u
 环境要求：.NET 10 SDK、Windows 10 1909+。
 
 ```bash
-git clone https://github.com/Zydr114/SimpleDesktopLyrics.git
+git clone https://github.com/Zydr114/EasyDesktopLyrics.git
 cd EasyDesktopLyrics
 dotnet build -c Release
 ```
