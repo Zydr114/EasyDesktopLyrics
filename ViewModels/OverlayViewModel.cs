@@ -23,13 +23,13 @@ public sealed class OverlayViewModel : ObservableObject
         nameof(CoverImage), nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverSizePct),
         nameof(WordHighlightLength), nameof(WordHighlightFraction),
         nameof(CoverTitle), nameof(CoverArtist),
-        nameof(CoverTitleEnabled), nameof(CoverTitleShowArtist),
+        nameof(CoverTitleEnabled), nameof(CoverTitleShowArtist), nameof(CoverTitleAnimDirection),
         nameof(CoverTitleFontFamily), nameof(CoverTitleColor), nameof(CoverTitleFontSize),
         nameof(CoverTitleOpacity), nameof(CoverTitleStrokeEnabled), nameof(CoverTitleStrokeBrush),
-        nameof(CoverTitleStrokeThickness),
+        nameof(CoverTitleStrokeThickness), nameof(CoverTitleShadowEffect),
         nameof(CoverArtistFontFamily), nameof(CoverArtistColor), nameof(CoverArtistFontSize),
         nameof(CoverArtistOpacity), nameof(CoverArtistStrokeEnabled), nameof(CoverArtistStrokeBrush),
-        nameof(CoverArtistStrokeThickness),
+        nameof(CoverArtistStrokeThickness), nameof(CoverArtistShadowEffect),
     ];
 
     private static readonly IBrush TransparentBrush = new SolidColorBrush(Colors.Transparent);
@@ -175,6 +175,44 @@ public sealed class OverlayViewModel : ObservableObject
     public bool CoverTitleEnabled => S.CoverTitleEnabled;
 
     public bool CoverTitleShowArtist => S.CoverTitleShowArtist;
+
+    /// <summary>歌名淡入淡出方向：0=无位移，1=上，2=下，3=左，4=右。</summary>
+    public int CoverTitleAnimDirection => Math.Clamp(S.CoverTitleAnimDirection, 0, 4);
+
+    public IEffect? CoverTitleShadowEffect => BuildShadow(
+        S.CoverTitleShadowEnabled, S.CoverTitleShadowColorHex,
+        S.CoverTitleShadowBlurRadius, S.CoverTitleShadowOffsetY, ref _coverTitleShadowCache, ref _coverTitleShadowKey);
+
+    public IEffect? CoverArtistShadowEffect => BuildShadow(
+        S.CoverArtistShadowEnabled, S.CoverArtistShadowColorHex,
+        S.CoverArtistShadowBlurRadius, S.CoverArtistShadowOffsetY, ref _coverArtistShadowCache, ref _coverArtistShadowKey);
+
+    private IEffect? _coverTitleShadowCache;
+    private string _coverTitleShadowKey = "";
+    private IEffect? _coverArtistShadowCache;
+    private string _coverArtistShadowKey = "";
+
+    private static IEffect? BuildShadow(
+        bool enabled, string colorHex, double blur, double offsetY,
+        ref IEffect? cache, ref string cacheKey)
+    {
+        if (!enabled)
+            return null;
+        var key = $"{colorHex}|{blur}|{offsetY}";
+        if (cacheKey != key)
+        {
+            cacheKey = key;
+            cache = new DropShadowEffect
+            {
+                OffsetX = 0,
+                OffsetY = offsetY,
+                BlurRadius = Math.Clamp(blur, 1, 60),
+                Opacity = 0.9,
+                Color = Color.TryParse(colorHex, out var c) ? c : Colors.Black,
+            };
+        }
+        return cache;
+    }
 
     public FontFamily CoverTitleFontFamily =>
         ParseFont(S.CoverTitleFont) ?? FontFamilyValue;

@@ -75,7 +75,8 @@
                            Opacity="{Binding CoverTitleOpacity}"
                            StrokeEnabled="{Binding CoverTitleStrokeEnabled}"
                            StrokeBrush="{Binding CoverTitleStrokeBrush}"
-                           StrokeThickness="{Binding CoverTitleStrokeThickness}" />
+                           StrokeThickness="{Binding CoverTitleStrokeThickness}"
+                           Effect="{Binding CoverTitleShadowEffect}" />
           <views:LyricText x:Name="CoverArtistText" Text="{Binding CoverArtist}"
                            HorizontalAlignment="Center"
                            FontFamily="{Binding CoverArtistFontFamily}"
@@ -85,6 +86,7 @@
                            StrokeEnabled="{Binding CoverArtistStrokeEnabled}"
                            StrokeBrush="{Binding CoverArtistStrokeBrush}"
                            StrokeThickness="{Binding CoverArtistStrokeThickness}"
+                           Effect="{Binding CoverArtistShadowEffect}"
                            IsVisible="{Binding CoverTitleShowArtist}" />
         </StackPanel>
       </Viewbox>

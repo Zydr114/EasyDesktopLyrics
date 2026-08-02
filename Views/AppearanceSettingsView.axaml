@@ -244,6 +244,11 @@
                 <TextBlock Classes="sectionLabel" Text="显示歌手" />
                 <ToggleSwitch Grid.Column="1" IsChecked="{Binding CoverTitleShowArtist, Mode=TwoWay}" />
               </Grid>
+              <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="淡入淡出方向" />
+                <ComboBox Grid.Column="1" ItemsSource="{Binding CoverTitleAnimDirectionOptions}"
+                          SelectedIndex="{Binding CoverTitleAnimDirectionIndex, Mode=TwoWay}" />
+              </Grid>
               <TextBlock Text="歌名与歌手分行显示，位于封面下方，随切歌动画淡入淡出；样式独立可调。" FontSize="11" Opacity="0.6" />
             </StackPanel>
           </Border>
@@ -298,6 +303,33 @@
                   </StackPanel>
                 </Border>
               </StackPanel>
+              <StackPanel Spacing="6">
+                <CheckBox Content="歌名阴影" IsChecked="{Binding CoverTitleShadowEnabled, Mode=TwoWay}" />
+                <Border IsVisible="{Binding CoverTitleShadowEnabled}" Margin="16,0,0,0">
+                  <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                      <TextBlock Classes="sectionLabel" Text="阴影颜色" />
+                      <local:ColorPicker Grid.Column="1" Color="{Binding CoverTitleShadowColorValue, Mode=TwoWay}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                      <TextBlock Classes="sectionLabel" Text="模糊半径" />
+                      <Slider Grid.Column="1" Minimum="1" Maximum="40" TickFrequency="1"
+                              Value="{Binding CoverTitleShadowBlurVal, Mode=TwoWay}" />
+                      <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                               Text="{Binding CoverTitleShadowBlurVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                               TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+                    </Grid>
+                    <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                      <TextBlock Classes="sectionLabel" Text="垂直偏移" />
+                      <Slider Grid.Column="1" Minimum="-20" Maximum="20" TickFrequency="1"
+                              Value="{Binding CoverTitleShadowOffsetYVal, Mode=TwoWay}" />
+                      <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                               Text="{Binding CoverTitleShadowOffsetYVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                               TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+                    </Grid>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
             </StackPanel>
           </Border>
         </StackPanel>
@@ -346,6 +378,33 @@
                               Value="{Binding CoverArtistStrokeThicknessVal, Mode=TwoWay}" />
                       <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
                                Text="{Binding CoverArtistStrokeThicknessVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}'}"
+                               TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+                    </Grid>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+              <StackPanel Spacing="6">
+                <CheckBox Content="歌手阴影" IsChecked="{Binding CoverArtistShadowEnabled, Mode=TwoWay}" />
+                <Border IsVisible="{Binding CoverArtistShadowEnabled}" Margin="16,0,0,0">
+                  <StackPanel Spacing="8">
+                    <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                      <TextBlock Classes="sectionLabel" Text="阴影颜色" />
+                      <local:ColorPicker Grid.Column="1" Color="{Binding CoverArtistShadowColorValue, Mode=TwoWay}" />
+                    </Grid>
+                    <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                      <TextBlock Classes="sectionLabel" Text="模糊半径" />
+                      <Slider Grid.Column="1" Minimum="1" Maximum="40" TickFrequency="1"
+                              Value="{Binding CoverArtistShadowBlurVal, Mode=TwoWay}" />
+                      <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                               Text="{Binding CoverArtistShadowBlurVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                               TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+                    </Grid>
+                    <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                      <TextBlock Classes="sectionLabel" Text="垂直偏移" />
+                      <Slider Grid.Column="1" Minimum="-20" Maximum="20" TickFrequency="1"
+                              Value="{Binding CoverArtistShadowOffsetYVal, Mode=TwoWay}" />
+                      <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                               Text="{Binding CoverArtistShadowOffsetYVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
                                TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
                     </Grid>
                   </StackPanel>

@@ -80,6 +80,18 @@ public sealed class AppSettings
     public bool CoverTitleEnabled { get; set; }
     /// <summary>歌名下方同时显示歌手（分行）。</summary>
     public bool CoverTitleShowArtist { get; set; } = true;
+    /// <summary>歌名淡入淡出方向：0=无位移，1=上，2=下，3=左，4=右。</summary>
+    public int CoverTitleAnimDirection { get; set; }
+    // 歌名行阴影
+    public bool CoverTitleShadowEnabled { get; set; }
+    public string CoverTitleShadowColorHex { get; set; } = "#000000";
+    public double CoverTitleShadowBlurRadius { get; set; } = 6;
+    public double CoverTitleShadowOffsetY { get; set; } = 2;
+    // 歌手行阴影
+    public bool CoverArtistShadowEnabled { get; set; }
+    public string CoverArtistShadowColorHex { get; set; } = "#000000";
+    public double CoverArtistShadowBlurRadius { get; set; } = 6;
+    public double CoverArtistShadowOffsetY { get; set; } = 2;
     // 歌名行
     public string CoverTitleFont { get; set; } = "Microsoft YaHei UI";
     public string CoverTitleColorHex { get; set; } = "#FFFFFF";

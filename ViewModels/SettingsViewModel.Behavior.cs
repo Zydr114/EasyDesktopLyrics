@@ -259,6 +259,104 @@ public sealed partial class SettingsViewModel
         }
     }
 
+    /// <summary>歌名淡入淡出方向选项：0=无位移，1=上，2=下，3=左，4=右。</summary>
+    public IReadOnlyList<string> CoverTitleAnimDirectionOptions { get; } =
+        ["无位移", "从上滑入", "从下滑入", "从左滑入", "从右滑入"];
+
+    public int CoverTitleAnimDirectionIndex
+    {
+        get => Math.Clamp(_settings.Current.CoverTitleAnimDirection, 0, 4);
+        set => _settings.Update(s => s.CoverTitleAnimDirection = Math.Clamp(value, 0, 4));
+    }
+
+    // ---------- 歌名/歌手阴影 ----------
+
+    public bool CoverTitleShadowEnabled
+    {
+        get => _settings.Current.CoverTitleShadowEnabled;
+        set
+        {
+            if (value == _settings.Current.CoverTitleShadowEnabled) return;
+            _settings.Update(s => s.CoverTitleShadowEnabled = value);
+        }
+    }
+
+    public Color CoverTitleShadowColorValue
+    {
+        get => Color.TryParse(_settings.Current.CoverTitleShadowColorHex, out var c) ? c : Colors.Black;
+        set
+        {
+            var hex = value.ToString().ToUpperInvariant();
+            if (hex == _settings.Current.CoverTitleShadowColorHex) return;
+            _settings.Update(s => s.CoverTitleShadowColorHex = hex);
+        }
+    }
+
+    public double CoverTitleShadowBlurVal
+    {
+        get => _settings.Current.CoverTitleShadowBlurRadius;
+        set
+        {
+            var v = Math.Round(value);
+            if (Math.Abs(v - _settings.Current.CoverTitleShadowBlurRadius) < 0.5) return;
+            _settings.Update(s => s.CoverTitleShadowBlurRadius = v);
+        }
+    }
+
+    public double CoverTitleShadowOffsetYVal
+    {
+        get => _settings.Current.CoverTitleShadowOffsetY;
+        set
+        {
+            var v = Math.Round(value);
+            if (Math.Abs(v - _settings.Current.CoverTitleShadowOffsetY) < 0.5) return;
+            _settings.Update(s => s.CoverTitleShadowOffsetY = v);
+        }
+    }
+
+    public bool CoverArtistShadowEnabled
+    {
+        get => _settings.Current.CoverArtistShadowEnabled;
+        set
+        {
+            if (value == _settings.Current.CoverArtistShadowEnabled) return;
+            _settings.Update(s => s.CoverArtistShadowEnabled = value);
+        }
+    }
+
+    public Color CoverArtistShadowColorValue
+    {
+        get => Color.TryParse(_settings.Current.CoverArtistShadowColorHex, out var c) ? c : Colors.Black;
+        set
+        {
+            var hex = value.ToString().ToUpperInvariant();
+            if (hex == _settings.Current.CoverArtistShadowColorHex) return;
+            _settings.Update(s => s.CoverArtistShadowColorHex = hex);
+        }
+    }
+
+    public double CoverArtistShadowBlurVal
+    {
+        get => _settings.Current.CoverArtistShadowBlurRadius;
+        set
+        {
+            var v = Math.Round(value);
+            if (Math.Abs(v - _settings.Current.CoverArtistShadowBlurRadius) < 0.5) return;
+            _settings.Update(s => s.CoverArtistShadowBlurRadius = v);
+        }
+    }
+
+    public double CoverArtistShadowOffsetYVal
+    {
+        get => _settings.Current.CoverArtistShadowOffsetY;
+        set
+        {
+            var v = Math.Round(value);
+            if (Math.Abs(v - _settings.Current.CoverArtistShadowOffsetY) < 0.5) return;
+            _settings.Update(s => s.CoverArtistShadowOffsetY = v);
+        }
+    }
+
     public string CoverTitleFont
     {
         get => _settings.Current.CoverTitleFont;
