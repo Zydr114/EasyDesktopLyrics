@@ -12,9 +12,9 @@
         <StackPanel Spacing="2">
           <TextBlock Classes="cardTitle" Text="歌词封面" />
           <TextBlock Classes="cardDesc"
-                     Text="点击播放控制条中的上一首/下一首时，封面平滑淡入居中展示，之后移动到常驻位置（若开启常驻）或淡出。封面为正方形，边长不超过歌词行高度的 120%。" />
+                     Text="点击播放控制条中的上一首/下一首时，封面平滑淡入居中展示，之后移动到常驻位置（若开启常驻）或按方向淡出。封面为正方形，边长不超过歌词行高度的 120%。" />
         </StackPanel>
-        <Grid ColumnDefinitions="110,*,64" ColumnSpacing="14" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
+        <Grid ColumnDefinitions="110,*,64" ColumnSpacing="14" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
           <TextBlock Classes="sectionLabel" Text="常驻显示" />
           <ToggleSwitch Grid.Column="1" IsChecked="{Binding CoverEnabled, Mode=TwoWay}" />
           <TextBlock Classes="sectionLabel" Text="切歌动画" Grid.Row="1" />
@@ -33,6 +33,24 @@
           <Slider Grid.Column="1" Grid.Row="4" Minimum="1" Maximum="15" TickFrequency="0.5"
                   Value="{Binding CoverAnimMaxSec, Mode=TwoWay}" />
           <TextBox Grid.Column="2" Grid.Row="4" MinHeight="28" Padding="8,2" Text="{Binding CoverAnimMaxSec, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}s'}"
+                   TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+          <TextBlock Classes="sectionLabel" Text="缓动曲线" Grid.Row="5" />
+          <ComboBox Grid.Column="1" Grid.Row="5" ItemsSource="{Binding CoverAnimEasingOptions}"
+                    SelectedIndex="{Binding CoverAnimEasingIndex, Mode=TwoWay}" Width="160"
+                    HorizontalAlignment="Left" />
+          <TextBlock Classes="sectionLabel" Text="动画时长" Grid.Row="6" />
+          <Slider Grid.Column="1" Grid.Row="6" Minimum="0.1" Maximum="2" TickFrequency="0.05"
+                  Value="{Binding CoverAnimDurationVal, Mode=TwoWay}" />
+          <TextBox Grid.Column="2" Grid.Row="6" MinHeight="28" Padding="8,2" Text="{Binding CoverAnimDurationVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}s'}"
+                   TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+          <TextBlock Classes="sectionLabel" Text="淡入淡出方向" Grid.Row="7" />
+          <ComboBox Grid.Column="1" Grid.Row="7" ItemsSource="{Binding CoverAnimDirectionOptions}"
+                    SelectedIndex="{Binding CoverAnimDirectionIndex, Mode=TwoWay}" Width="160"
+                    HorizontalAlignment="Left" />
+          <TextBlock Classes="sectionLabel" Text="位移强度" Grid.Row="8" />
+          <Slider Grid.Column="1" Grid.Row="8" Minimum="0" Maximum="60" TickFrequency="1"
+                  Value="{Binding CoverAnimSlideDistanceVal, Mode=TwoWay}" />
+          <TextBox Grid.Column="2" Grid.Row="8" MinHeight="28" Padding="8,2" Text="{Binding CoverAnimSlideDistanceVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}px'}"
                    TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
         </Grid>
 

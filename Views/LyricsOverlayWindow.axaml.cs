@@ -1,6 +1,9 @@
 using Avalonia;
+using Avalonia.Animation;
+using Avalonia.Animation.Easings;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Transformation;
 using Avalonia.Platform;
@@ -131,6 +134,9 @@ public sealed partial class LyricsOverlayWindow : Window
         _lastCoverTitleEnabled = _vm.CoverTitleEnabled;
         LyricsArea.MinWidth = _vm.MaxTextWidth;
 
+        ApplyCoverAnimationStyle();
+        _settingsService.Changed += ApplyCoverAnimationStyle;
+
         _mainGrid.SizeChanged += (_, _) => UpdateCoverSize();
         // 歌词行宽度变化（不同行文本长度）时封面位置跟随（靠右布局依赖歌词宽度）
         RootPanel.SizeChanged += (_, _) => UpdateCoverPosition();
@@ -206,7 +212,7 @@ public sealed partial class LyricsOverlayWindow : Window
         SyncAllBindings();
     }
 
-    /// <summary>已唱层：整行已唱色 + 已唱描边，裁剪分界线左侧；阴影作用于整行。</summary>
+    /// <summary>已唱层：整行已唱色布局，逐字渐变遮罩只露已唱段（含正在唱字渐变带）；阴影作用于整行。</summary>
     private void BindLyric(LyricText lt)
     {
         BindLyricBase(lt);
@@ -219,7 +225,7 @@ public sealed partial class LyricsOverlayWindow : Window
         lt.HighlightClip = LyricText.ClipSideMode.Left;
     }
 
-    /// <summary>未唱层：整行未唱色 + 独立未唱描边，裁剪分界线右侧（未唱段）+ 阴影。</summary>
+    /// <summary>未唱层：整行未唱色布局 + 独立未唱描边，逐字渐变遮罩只露未唱段；阴影作用于整行。</summary>
     private void BindInactiveLyric(LyricText lt)
     {
         BindLyricBase(lt);
@@ -318,11 +324,12 @@ public sealed partial class LyricsOverlayWindow : Window
         }
         _glowLayers.Clear();
 
-        // 未唱辉光层（整行未唱色 + 未唱辉光，裁分界线右侧；默认关）
+        // 未唱辉光层（整行未唱色 + 未唱辉光，渐变遮罩只露未唱段；默认关）
         if (_vm.InactiveGlowEnabled)
         {
             var ig = CreateMainGlowLyric(null);
             ig.Bind(LyricText.HighlightLengthProperty, new Avalonia.Data.Binding("WordHighlightLength"));
+            ig.Bind(LyricText.HighlightFractionProperty, new Avalonia.Data.Binding("WordHighlightFraction"));
             ig.Bind(LyricText.FillProperty, new Avalonia.Data.Binding("InactiveFill"));
             ig.Bind(Visual.EffectProperty, new Avalonia.Data.Binding("InactiveGlowEffect"));
             ig.HighlightClip = LyricText.ClipSideMode.Right;
@@ -332,9 +339,10 @@ public sealed partial class LyricsOverlayWindow : Window
 
         if (_vm.GlowEnabled)
         {
-            // 主行已唱辉光：裁分界线左侧 → DropShadowEffect 只照亮已唱段（含正在唱字已唱半）
+            // 主行已唱辉光：渐变遮罩只露已唱段 → DropShadowEffect 只照亮已唱段（含正在唱字渐变部分）
             var gm = CreateMainGlowLyric("Fill");
             gm.Bind(LyricText.HighlightLengthProperty, new Avalonia.Data.Binding("WordHighlightLength"));
+            gm.Bind(LyricText.HighlightFractionProperty, new Avalonia.Data.Binding("WordHighlightFraction"));
             gm.Bind(Visual.EffectProperty, new Avalonia.Data.Binding("GlowEffect"));
             gm.HighlightClip = LyricText.ClipSideMode.Left;
             _mainGrid.Children.Insert(0, gm);
@@ -451,6 +459,49 @@ public sealed partial class LyricsOverlayWindow : Window
         return b.Build();
     }
 
+    /// <summary>按设置重建封面动画过渡（缓动曲线 + 时长），作用于移动/缩放/淡入淡出。</summary>
+    private void ApplyCoverAnimationStyle()
+    {
+        var easing = EasingFor(_settingsService.Current.CoverAnimEasing);
+        var dur = TimeSpan.FromMilliseconds(Math.Clamp(_settingsService.Current.CoverAnimDurationMs, 100, 2000));
+
+        Cover.Transitions = new Transitions
+        {
+            new DoubleTransition { Property = Visual.OpacityProperty, Duration = dur, Easing = easing },
+            new TransformOperationsTransition { Property = Visual.RenderTransformProperty, Duration = dur, Easing = easing },
+        };
+        CoverImage.Transitions = new Transitions
+        {
+            new DoubleTransition { Property = Layoutable.WidthProperty, Duration = dur, Easing = easing },
+            new DoubleTransition { Property = Layoutable.HeightProperty, Duration = dur, Easing = easing },
+        };
+    }
+
+    private static Easing EasingFor(string name) => name switch
+    {
+        "Linear" => new LinearEasing(),
+        "Cubic" => new CubicEaseOut(),
+        "Sine" => new SineEaseOut(),
+        "Exponential" => new ExponentialEaseOut(),
+        "Back" => new BackEaseOut(),
+        _ => new QuadraticEaseOut(),
+    };
+
+    /// <summary>切歌封面淡入淡出方向偏移：1=上，2=下，3=左，4=右，0=无位移；强度可配置。</summary>
+    private (double dx, double dy) CoverAnimSlideOffset()
+    {
+        var dir = Math.Clamp(_settingsService.Current.CoverAnimDirection, 0, 4);
+        var d = Math.Clamp(_settingsService.Current.CoverAnimSlideDistance, 0, 60);
+        return dir switch
+        {
+            1 => (0, -d), // 起点在上方（向下滑入）
+            2 => (0, d),  // 起点在下方（向上滑入）
+            3 => (-d, 0), // 起点在左侧（向右滑入）
+            4 => (d, 0),  // 起点在右侧（向左滑入）
+            _ => (0, 0),
+        };
+    }
+
     /// <summary>歌词加载完成的等待超时（防封面卡死）。</summary>
     private static readonly TimeSpan CoverAnimTimeout = TimeSpan.FromSeconds(6);
 
@@ -459,7 +510,8 @@ public sealed partial class LyricsOverlayWindow : Window
     /// 窗口尺寸全程不变（不隐藏歌词、不撑高窗口、不锁定 MinWidth）；
     /// 封面作为覆盖层放大到行高尺寸显示在歌词行中央（歌词透明被掩盖），
     /// 歌词 Ready/NoLyric 后（或超时）执行分支：
-    /// 常驻=封面缩小移动到常驻位 / 不常驻=淡出。尺寸与位置均由 Transitions 平滑过渡。
+    /// 常驻=封面缩小移动到常驻位 / 不常驻=按方向滑出淡出。尺寸与位置均由 Transitions 平滑过渡，
+    /// 缓动曲线与时长可配置（ApplyCoverAnimationStyle）。
     /// </summary>
     private void OnCoverChanged()
     {
@@ -496,8 +548,25 @@ public sealed partial class LyricsOverlayWindow : Window
             CoverImage.Width = _coverAnimSize;
             CoverImage.Height = _coverAnimSize;
             var cx = Math.Max(0, (OuterGrid.Bounds.Width - _coverAnimSize) / 2);
-            Cover.RenderTransform = Translate(cx, 0);
-            Cover.Opacity = 1;
+
+            if (_vm.CoverEnabled)
+            {
+                // 常驻：封面从常驻位过渡到中心（掩盖歌词），移动/缩放用可配置缓动与时长
+                Cover.RenderTransform = Translate(cx, 0);
+                Cover.Opacity = 1;
+            }
+            else
+            {
+                // 不常驻：从方向位瞬移起点 → 淡入 + 滑向中心（参考歌名切入动画）
+                var (ox, oy) = CoverAnimSlideOffset();
+                var saved = Cover.Transitions;
+                Cover.Transitions = null;
+                Cover.RenderTransform = Translate(cx + ox, oy);
+                Cover.Transitions = saved;
+                Cover.RenderTransform = Translate(cx, 0);
+                Cover.Opacity = 1;
+            }
+
             EnterCoverTitle();
             _coverPosDirty = true;
             Log.Info($"cover: animation started, winW={ClientSize.Width:F0} size={_coverAnimSize:F0} titleEnabled={_vm.CoverTitleEnabled}");
@@ -558,11 +627,13 @@ public sealed partial class LyricsOverlayWindow : Window
         }
         else
         {
-            // 不常驻：封面淡出并恢复常驻尺寸
+            // 不常驻：封面滑向方向位并淡出（与进入方向一致），随后恢复常驻尺寸
+            var (ox, oy) = CoverAnimSlideOffset();
+            var cx = Math.Max(0, (OuterGrid.Bounds.Width - _coverAnimSize) / 2);
+            Cover.RenderTransform = Translate(cx + ox, oy);
             Cover.Opacity = 0;
             CoverImage.Width = _coverSize;
             CoverImage.Height = _coverSize;
-            Cover.RenderTransform = Translate(0, 0);
         }
     }
 
@@ -736,6 +807,7 @@ public sealed partial class LyricsOverlayWindow : Window
         _hideControlsTimer.Stop();
         _coverStageTimer.Stop();
         _coverTimeoutTimer.Stop();
+        _settingsService.Changed -= ApplyCoverAnimationStyle;
         base.OnClosed(e);
     }
 

@@ -74,6 +74,14 @@ public sealed class AppSettings
     public int CoverAnimMinMs { get; set; } = 1200;
     /// <summary>切歌封面最长显示时长（ms，歌词加载超时时强制结束）。</summary>
     public int CoverAnimMaxMs { get; set; } = 6000;
+    /// <summary>切歌封面动画缓动曲线：Linear / Quadratic / Cubic / Sine / Exponential / Back。</summary>
+    public string CoverAnimEasing { get; set; } = "Quadratic";
+    /// <summary>切歌封面移动/淡入淡出动画时长（ms）。</summary>
+    public int CoverAnimDurationMs { get; set; } = 450;
+    /// <summary>切歌封面淡入淡出方向：0=无位移，1=上，2=下，3=左，4=右。</summary>
+    public int CoverAnimDirection { get; set; }
+    /// <summary>切歌封面淡入淡出位移强度（px）。</summary>
+    public double CoverAnimSlideDistance { get; set; } = 12;
 
     // ---- 切歌封面歌名 ----
     /// <summary>切歌动画中在封面旁显示歌名（默认关）。</summary>

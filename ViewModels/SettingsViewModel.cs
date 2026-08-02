@@ -91,6 +91,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         nameof(LyricsFolder), nameof(GlobalOffsetMs),
         nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverSizePctVal),
         nameof(CoverAnimMinSec), nameof(CoverAnimMaxSec),
+        nameof(CoverAnimEasingIndex), nameof(CoverAnimDurationVal),
+        nameof(CoverAnimDirectionIndex), nameof(CoverAnimSlideDistanceVal),
         nameof(CoverTitleEnabled), nameof(CoverTitleShowArtist), nameof(CoverTitleAnimDirectionIndex),
         nameof(CoverTitleSlideDistanceVal),
         nameof(CoverTitleFont), nameof(CoverTitleColorValue), nameof(CoverTitleFontSizeVal),

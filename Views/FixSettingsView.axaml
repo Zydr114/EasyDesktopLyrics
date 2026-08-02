@@ -10,6 +10,8 @@
       <StackPanel Spacing="8">
         <TextBlock Classes="cardTitle" Text="当前曲目" />
         <TextBlock Text="{Binding CurrentTrackText}" TextWrapping="Wrap" FontSize="13" />
+        <TextBlock Text="{Binding CurrentWordDataText}" TextWrapping="Wrap" FontSize="13"
+                   Opacity="0.85" />
       </StackPanel>
     </Border>
 

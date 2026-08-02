@@ -237,6 +237,56 @@ public sealed partial class SettingsViewModel
         }
     }
 
+    // ---------- 切歌封面动画 ----------
+
+    public IReadOnlyList<string> CoverAnimEasingOptions { get; } = ["线性", "二次", "三次", "正弦", "指数", "回弹"];
+
+    private static readonly string[] CoverAnimEasingValues = ["Linear", "Quadratic", "Cubic", "Sine", "Exponential", "Back"];
+
+    public int CoverAnimEasingIndex
+    {
+        get => Math.Clamp(Array.IndexOf(CoverAnimEasingValues, _settings.Current.CoverAnimEasing), 0, CoverAnimEasingValues.Length - 1);
+        set
+        {
+            if (value < 0 || value >= CoverAnimEasingValues.Length) return;
+            _settings.Update(s => s.CoverAnimEasing = CoverAnimEasingValues[value]);
+        }
+    }
+
+    /// <summary>切歌封面移动/淡入淡出动画时长（秒）。</summary>
+    public double CoverAnimDurationVal
+    {
+        get => _settings.Current.CoverAnimDurationMs / 1000.0;
+        set
+        {
+            var ms = (int)Math.Round(value * 1000);
+            if (ms == _settings.Current.CoverAnimDurationMs) return;
+            _settings.Update(s => s.CoverAnimDurationMs = Math.Clamp(ms, 100, 2000));
+        }
+    }
+
+    /// <summary>切歌封面淡入淡出方向选项：0=无位移，1=上，2=下，3=左，4=右。</summary>
+    public IReadOnlyList<string> CoverAnimDirectionOptions { get; } =
+        ["无位移", "从上方", "从下方", "从左侧", "从右侧"];
+
+    public int CoverAnimDirectionIndex
+    {
+        get => Math.Clamp(_settings.Current.CoverAnimDirection, 0, 4);
+        set => _settings.Update(s => s.CoverAnimDirection = Math.Clamp(value, 0, 4));
+    }
+
+    /// <summary>切歌封面淡入淡出位移强度（px）。</summary>
+    public double CoverAnimSlideDistanceVal
+    {
+        get => _settings.Current.CoverAnimSlideDistance;
+        set
+        {
+            var v = Math.Round(value);
+            if (Math.Abs(v - _settings.Current.CoverAnimSlideDistance) < 0.5) return;
+            _settings.Update(s => s.CoverAnimSlideDistance = Math.Clamp(v, 0, 60));
+        }
+    }
+
     // ---------- 切歌封面歌名 ----------
 
     public bool CoverTitleEnabled

@@ -8,11 +8,11 @@ using Avalonia.Utilities;
 namespace EasyDesktopLyrics.Views;
 
 /// <summary>
-/// 自绘歌词文本：整行单色 TextLayout + 按分界线 PushClip 裁剪实现卡拉 OK 逐字高亮；
-/// 已唱层裁左侧（ClipSide=Left）、未唱层裁右侧（ClipSide=Right），分界线在正在唱字符内部
-/// 随 HighlightFraction 平滑移动（字符内同时存在已唱/未唱两种样式）。
-/// 描边 = 8 向偏移整行绘制；辉光由外部 Effect 提供（作用于裁剪后的结果）。
-/// HighlightLength = -1 或 h&gt;=len 时不裁剪（整行单色）。
+/// 自绘歌词文本：非逐字时整行单色 TextLayout 平涂；
+/// 逐字（卡拉 OK）时整行一次绘制 + 线性渐变笔刷——每个字符按"已唱色 → 分界线 → 柔和过渡带 → 未唱色"
+/// 平滑渐变，分界线在当前字内部随 HighlightFraction 平滑右移（真渐变填充，非硬裁剪）。
+/// 描边 = 8 向偏移整行绘制（使用描边渐变）；辉光由外部 Effect 提供（作用于渐变结果）。
+/// HighlightLength = -1 时整行单色（无逐字数据）。
 /// </summary>
 public sealed class LyricText : Control
 {
@@ -22,7 +22,7 @@ public sealed class LyricText : Control
         (-0.7, -0.7), (0.7, 0.7), (-0.7, 0.7), (0.7, -0.7),
     };
 
-    /// <summary>裁剪模式：0 = 不裁剪，1 = 裁分界线左侧（显示已唱段），2 = 裁分界线右侧（显示未唱段）。</summary>
+    /// <summary>层角色：0 = 整行平涂；1 = 已唱层（渐变遮罩露已唱段）；2 = 未唱层（渐变遮罩露未唱段）。</summary>
     public enum ClipSideMode
     {
         None = 0,
@@ -41,7 +41,7 @@ public sealed class LyricText : Control
     public static readonly StyledProperty<double> HighlightFractionProperty =
         AvaloniaProperty.Register<LyricText, double>(nameof(HighlightFraction), 0);
 
-    /// <summary>裁剪模式（层角色固定，由宿主设置）。</summary>
+    /// <summary>层角色（固定，由宿主设置）：Left=已唱层、Right=未唱层、None=平涂。</summary>
     public static readonly StyledProperty<ClipSideMode> HighlightClipProperty =
         AvaloniaProperty.Register<LyricText, ClipSideMode>(nameof(HighlightClip), ClipSideMode.None);
 
@@ -88,6 +88,7 @@ public sealed class LyricText : Control
     private TextLayout? _bodyLayout;
     private TextLayout? _strokeLayout;
     private bool _layoutDirty = true;
+    private double[] _charLeft = [];
 
     static LyricText()
     {
@@ -226,26 +227,31 @@ public sealed class LyricText : Control
 
         var thickness = StrokeEnabled ? StrokeThickness : 0;
 
-        var clipped = false;
-        if (HighlightClip != ClipSideMode.None && body.Width > 0)
+        // 平涂路径（无逐字数据 / 单色层）：整行单色
+        if (IsFlatMode || HighlightClip == ClipSideMode.None)
         {
-            var clipX = ComputeClipX(body);
-            if (clipX > 0 && clipX < body.Width)
-            {
-                var rect = HighlightClip == ClipSideMode.Left
-                    ? new Rect(0, 0, clipX, body.Height)
-                    : new Rect(clipX, 0, Math.Max(0, body.Width - clipX), body.Height);
-                if (rect.Width > 0)
-                {
-                    using var _ = context.PushClip(rect);
-                    clipped = true;
-                    DrawBody(context, body, thickness);
-                    return;
-                }
-            }
+            DrawBody(context, body, thickness);
+            return;
         }
 
-        DrawBody(context, body, thickness);
+        // 逐字渐变路径：整行缓存的已唱/未唱纯色布局 + PushOpacityMask 逐字渐变遮罩，
+        // 遮罩在当前字内带柔和过渡带、分界线随 HighlightFraction 平滑右移 → 字内真渐变过渡（非硬裁剪）。
+        var mask = BuildMask(body, HighlightClip == ClipSideMode.Left);
+        if (mask == null)
+        {
+            DrawBody(context, body, thickness);
+            return;
+        }
+
+        using (context.PushOpacityMask(mask, new Rect(0, 0, body.Width, body.Height)))
+        {
+            if (thickness > 0 && _strokeLayout != null)
+            {
+                foreach (var (dx, dy) in StrokeOffsets)
+                    _strokeLayout.Draw(context, new Point(dx * thickness, dy * thickness));
+            }
+            body.Draw(context, new Point());
+        }
     }
 
     private void DrawBody(DrawingContext context, TextLayout body, double thickness)
@@ -281,6 +287,7 @@ public sealed class LyricText : Control
         {
             _bodyLayout = null;
             _strokeLayout = null;
+            _charLeft = [];
             return;
         }
 
@@ -290,32 +297,113 @@ public sealed class LyricText : Control
         var maxWidth = double.PositiveInfinity;
         var maxHeight = double.PositiveInfinity;
 
-        // 整行单色：逐字明暗由层裁剪（HighlightClip）实现，这里只需一种前景色
+        // 整行单色：逐字明暗由渐变遮罩（BuildMask/BuildGradient）实现，这里只需一种前景色
         _strokeLayout = StrokeEnabled && StrokeThickness > 0 && StrokeBrush != null
             ? CreateLayout(text, typeface, StrokeBrush, alignment, wrapping, maxWidth, maxHeight)
             : null;
 
         _bodyLayout = CreateLayout(text, typeface, Fill, alignment, wrapping, maxWidth, maxHeight);
+        _charLeft = BuildCharLefts(_bodyLayout, text);
     }
 
-    /// <summary>分界线 X（正在唱字左缘 + 字宽 × 进度）；无逐字/整行完成时返回 -1（不裁剪）。</summary>
-    private double ComputeClipX(TextLayout layout)
+    /// <summary>平涂模式：无逐字数据（HighlightLength &lt; 0）或文本为空 → 整行单色。</summary>
+    private bool IsFlatMode
     {
-        var h = HighlightLength;
-        var text = Text;
-        if (h < 0 || text == null)
-            return -1;
-        var len = text.Length;
-        if (h >= len)
-            return -1;
+        get
+        {
+            var text = Text;
+            return string.IsNullOrEmpty(text) || HighlightLength < 0;
+        }
+    }
 
+    /// <summary>逐字左缘 X（相对行首），末位为整行宽度；供渐变 stop 定位。</summary>
+    private static double[] BuildCharLefts(TextLayout layout, string text)
+    {
+        var left = new double[text.Length + 1];
+        for (var i = 0; i < text.Length; i++)
+            left[i] = layout.HitTestTextPosition(i).X;
+        left[text.Length] = layout.Width;
+        return left;
+    }
+
+    /// <summary>
+    /// 逐字渐变遮罩（PushOpacityMask 用，只取 alpha）：已唱段不透明、未唱段透明、正在唱字内
+    /// 从分界线到过渡带平滑渐变。maskPlayed=true → 遮住未唱段（已唱层用）；false → 遮住已唱段（未唱层用）。
+    /// </summary>
+    private IBrush? BuildMask(TextLayout layout, bool maskPlayed)
+    {
+        return maskPlayed
+            ? BuildGradient(layout, Colors.Black, Colors.Transparent)
+            : BuildGradient(layout, Colors.Transparent, Colors.Black);
+    }
+
+    /// <summary>逐字渐变：每个字符左边界放一个颜色 stop（已唱=played / 未唱=unplayed），
+    /// 正在唱字内放"played 实色 → 分界线 → 柔和过渡带 → unplayed"。
+    /// 渐变两端用 Absolute 点（0..width）、stop offset 用 0..1 归一化 → 与目标矩形尺寸无关，随字形精确定位。</summary>
+    private LinearGradientBrush? BuildGradient(TextLayout layout, Color played, Color unplayed)
+    {
+        var len = _charLeft.Length - 1;
+        if (len <= 0)
+            return null;
+
+        var done = Math.Clamp(HighlightLength, 0, len);
         var frac = Math.Clamp(HighlightFraction, 0, 1);
-        var curLen = char.IsHighSurrogate(text[h]) ? 2 : 1;
-        var x0 = layout.HitTestTextPosition(h).X;
-        var x1 = h + curLen < len
-            ? layout.HitTestTextPosition(h + curLen).X
-            : layout.Width; // 正在唱字为最后一个字符：右缘 = 文本宽度
-        return x0 + (x1 - x0) * frac;
+        var width = layout.Width;
+        if (width <= 0)
+            return null;
+
+        var stops = new List<GradientStop>(len * 2 + 4);
+        AddStop(stops, 0, played);
+
+        for (var i = 0; i < len; i++)
+        {
+            var x0 = _charLeft[i];
+            var x1 = _charLeft[i + 1];
+            if (i < done)
+            {
+                AddStop(stops, x0 / width, played);
+            }
+            else if (i > done)
+            {
+                AddStop(stops, x0 / width, unplayed);
+            }
+            else
+            {
+                // 正在唱字：played 实色铺到分界线，再经过渡带渐变到 unplayed
+                var charW = Math.Max(x1 - x0, 0.001);
+                var boundary = x0 + charW * frac;
+                var fadeW = Math.Min(charW * 0.35, 8);
+                var fadeEnd = Math.Min(x1, boundary + fadeW);
+                AddStop(stops, x0 / width, played);
+                AddStop(stops, boundary / width, played);
+                AddStop(stops, fadeEnd / width, unplayed);
+            }
+        }
+        AddStop(stops, 1, done >= len ? played : unplayed);
+
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new RelativePoint(0, 0, RelativeUnit.Absolute),
+            EndPoint = new RelativePoint(width, 0, RelativeUnit.Absolute),
+        };
+        brush.GradientStops.AddRange(stops);
+        return brush;
+    }
+
+    /// <summary>合并相邻等位置 stop（代理对/零宽字符会共用左缘）。</summary>
+    private static void AddStop(List<GradientStop> stops, double offset, Color color)
+    {
+        if (stops.Count > 0)
+        {
+            var last = stops[^1];
+            if (Math.Abs(last.Offset - offset) < 0.0005)
+            {
+                if (last.Color != color)
+                    stops[^1] = new GradientStop(color, offset);
+                return;
+            }
+        }
+        stops.Add(new GradientStop(color, offset));
     }
 
     private TextLayout CreateLayout(

@@ -36,6 +36,19 @@ public sealed partial class SettingsViewModel
         }
     }
 
+    /// <summary>当前歌曲是否带逐字（卡拉 OK）歌词。</summary>
+    public string CurrentWordDataText
+    {
+        get
+        {
+            if (_orchestrator.Phase != LyricsPhase.Ready)
+                return "逐字歌词：—";
+            return _orchestrator.HasWordData
+                ? "逐字歌词：有（卡拉 OK 逐字高亮）"
+                : "逐字歌词：无（整行高亮）";
+        }
+    }
+
     public string SearchKeyword
     {
         get => _searchKeyword;
@@ -95,6 +108,7 @@ public sealed partial class SettingsViewModel
     private void OnOrchestratorChanged()
     {
         Raise(nameof(CurrentTrackText));
+        Raise(nameof(CurrentWordDataText));
         SyncFromTrack(force: false);
     }
 

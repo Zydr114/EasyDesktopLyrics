@@ -79,6 +79,9 @@ public sealed partial class LyricsOrchestrator
     /// <summary>true = 当前歌词为纯音乐（仅元信息行）。</summary>
     public bool IsInstrumental => _doc?.IsInstrumental == true;
 
+    /// <summary>当前歌词是否含逐字（卡拉 OK）数据。</summary>
+    public bool HasWordData => _hasWords;
+
     /// <summary>纯音乐元信息行已显示完毕（时间超过最后一行 5 秒）→ 切回标题。</summary>
     public bool InstrumentalEnded => _instrumentalEnded;
 
@@ -343,15 +346,76 @@ public sealed partial class LyricsOrchestrator
 
         var content = texts.Where(t => !MetaInfoPattern().IsMatch(t)).ToList();
         if (content.Count > 0 && !content.All(t => InstrumentalPattern().IsMatch(t)))
-            return doc; // 正常歌词
+            return AssignCharTimes(doc); // 正常歌词
 
         // 纯音乐：保留元信息行供短暂显示
         var meta = doc.Lines
             .Where(l => l.Text.Length > 0 && MetaInfoPattern().IsMatch(l.Text))
             .ToList();
         return meta.Count > 0
-            ? new LyricDocument(meta, isInstrumental: true)
+            ? AssignCharTimes(new LyricDocument(meta, isInstrumental: true))
             : null;
+    }
+
+    /// <summary>为每行填充逐字符时间轴（CharTimes）：多字词按字均分持续时间，无逐字词的行保持 null（整行高亮）。</summary>
+    private static LyricDocument AssignCharTimes(LyricDocument doc)
+    {
+        var lines = doc.Lines.ToList();
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var l = lines[i];
+            if (l.Words is not { Count: > 0 } || l.Text.Length == 0)
+                continue;
+            var nextLineStart = i + 1 < lines.Count ? lines[i + 1].TimeMs : long.MaxValue;
+            var charTimes = BuildCharTimes(l, nextLineStart);
+            if (charTimes != null)
+                lines[i] = l with { CharTimes = charTimes };
+        }
+        return new LyricDocument(lines, doc.IsInstrumental);
+    }
+
+    /// <summary>
+    /// 逐字符时间轴：words 按序覆盖 line.Text 的字符区间；字时长 = 词持续（下一词起始 − 本词起始）÷ 字数，
+    /// 末词用 3 秒兜底（不越过下一行起始）。词文本与行文本对齐失败时 clamp 并兜底，保证索引不越界。
+    /// </summary>
+    private static IReadOnlyList<LyricCharTime>? BuildCharTimes(LyricLine line, long nextLineStart)
+    {
+        var text = line.Text;
+        var words = line.Words!;
+        var times = new List<LyricCharTime>(text.Length);
+        var offset = 0;
+        for (var w = 0; w < words.Count; w++)
+        {
+            var word = words[w];
+            var len = Math.Min(word.Text.Length, text.Length - offset);
+            if (len <= 0)
+            {
+                offset += word.Text.Length;
+                continue;
+            }
+            var wordStart = word.TimeMs;
+            var wordEnd = w + 1 < words.Count
+                ? words[w + 1].TimeMs
+                : Math.Min(word.TimeMs + 3000, nextLineStart);
+            if (wordEnd <= wordStart)
+                wordEnd = wordStart + 1;
+            for (var k = 0; k < len; k++)
+            {
+                var start = wordStart + (long)((wordEnd - wordStart) * (double)k / len);
+                var end = wordStart + (long)((wordEnd - wordStart) * (double)(k + 1) / len);
+                times.Add(new LyricCharTime(offset + k, start, end));
+            }
+            offset += len;
+        }
+        // 行内未被词覆盖的零散字符（对齐差异兜底）：视为随整行演唱
+        if (offset < text.Length)
+        {
+            var tailStart = times.Count > 0 ? times[^1].EndMs : line.TimeMs;
+            var tailEnd = nextLineStart == long.MaxValue ? tailStart + 3000 : Math.Max(nextLineStart, tailStart + 1);
+            for (var i = offset; i < text.Length; i++)
+                times.Add(new LyricCharTime(i, tailStart, tailEnd));
+        }
+        return times.Count > 0 ? times : null;
     }
 
     /// <summary>
@@ -475,12 +539,13 @@ public sealed partial class LyricsOrchestrator
     private void UpdateTimer()
     {
         var shouldRun = Phase == LyricsPhase.Ready && _clock.IsPlaying;
-        if (shouldRun && !_timer.IsEnabled)
+        if (shouldRun)
         {
-            _timer.Interval = WordMode ? TimeSpan.FromMilliseconds(30) : TimeSpan.FromMilliseconds(100);
-            _timer.Start();
+            _timer.Interval = WordMode ? TimeSpan.FromMilliseconds(16) : TimeSpan.FromMilliseconds(100);
+            if (!_timer.IsEnabled)
+                _timer.Start();
         }
-        else if (!shouldRun && _timer.IsEnabled)
+        else if (_timer.IsEnabled)
         {
             _timer.Stop();
         }
@@ -516,30 +581,23 @@ public sealed partial class LyricsOrchestrator
     }
 
     /// <summary>
-    /// 统计当前行已唱字符数与正在唱字符的渐变进度：
-    /// 已唱字符数 = 时间戳 ≤ 播放位置的字符累计；正在唱字进度 = (pos - 字起始) / 字时长
-    /// （字时长 = 下一字起始 - 本字起始；末字用 3 秒兜底）。无逐字 → (-1, 0)。
+    /// 统计当前行已唱字符数与正在唱字符的渐变进度（字符级时间轴）：
+    /// 已唱字符数 = EndMs ≤ 播放位置的字符累计；正在唱字进度 = (pos − 字起始) / 字持续。
+    /// 无逐字数据 → (-1, 0)。
     /// </summary>
     private static (int Count, double Frac) CountDoneChars(LyricLine line, long posMs)
     {
-        var words = line.Words;
-        if (words == null || words.Count == 0)
+        var times = line.CharTimes;
+        if (times == null || times.Count == 0)
             return (-1, 0);
-        var n = 0;
-        for (var i = 0; i < words.Count; i++)
+        for (var i = 0; i < times.Count; i++)
         {
-            var t = words[i].TimeMs;
-            if (t > posMs)
-            {
-                var end = i + 1 < words.Count
-                    ? words[i + 1].TimeMs
-                    : t + 3000; // 末字时长兜底
-                var dur = Math.Max(end - t, 1);
-                return (n, Math.Clamp((posMs - t) / (double)dur, 0, 1));
-            }
-            n += words[i].Text.Length;
+            if (times[i].EndMs <= posMs)
+                continue;
+            var dur = Math.Max(times[i].EndMs - times[i].StartMs, 1);
+            return (i, Math.Clamp((posMs - times[i].StartMs) / (double)dur, 0, 1));
         }
-        return (n, 1);
+        return (times.Count, 1);
     }
 
     /// <summary>伴奏/间奏/前奏一律显示 "···"，始终保持有内容。</summary>

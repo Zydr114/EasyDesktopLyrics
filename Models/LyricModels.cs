@@ -3,8 +3,16 @@ namespace EasyDesktopLyrics.Models;
 /// <summary>一个逐字（卡拉 OK）歌词字：从该时间戳起演唱该字。</summary>
 public sealed record LyricWord(long TimeMs, string Text);
 
-/// <summary>一行歌词（毫秒时间戳 + 原文 + 可选翻译 + 可选逐字序列）。</summary>
-public sealed record LyricLine(long TimeMs, string Text, string? Translation, IReadOnlyList<LyricWord>? Words = null);
+/// <summary>一个字符的时间区间（Index = 在 line.Text 中的字符偏移；多字词按字均分后得到）。</summary>
+public sealed record LyricCharTime(int Index, long StartMs, long EndMs);
+
+/// <summary>一行歌词（毫秒时间戳 + 原文 + 可选翻译 + 可选逐字序列 + 可选逐字符时间轴）。</summary>
+public sealed record LyricLine(
+    long TimeMs,
+    string Text,
+    string? Translation,
+    IReadOnlyList<LyricWord>? Words = null,
+    IReadOnlyList<LyricCharTime>? CharTimes = null);
 
 /// <summary>解析后的整首歌词，行按时间升序。</summary>
 public sealed class LyricDocument
