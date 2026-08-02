@@ -22,6 +22,15 @@ public sealed class OverlayViewModel : ObservableObject
         nameof(InactiveStrokeEnabled), nameof(InactiveStrokeBrush), nameof(InactiveStrokeThickness), nameof(InactiveGlowEffect),
         nameof(CoverImage), nameof(CoverEnabled), nameof(CoverCutAnimation), nameof(CoverSizePct),
         nameof(WordHighlightLength), nameof(WordHighlightFraction),
+        nameof(CoverTitle), nameof(CoverArtist),
+        nameof(CoverTitleEnabled), nameof(CoverTitleShowArtist), nameof(CoverTitlePosition),
+        nameof(CoverAnimCoverOpacity),
+        nameof(CoverTitleFontFamily), nameof(CoverTitleColor), nameof(CoverTitleFontSize),
+        nameof(CoverTitleOpacity), nameof(CoverTitleStrokeEnabled), nameof(CoverTitleStrokeBrush),
+        nameof(CoverTitleStrokeThickness),
+        nameof(CoverArtistFontFamily), nameof(CoverArtistColor), nameof(CoverArtistFontSize),
+        nameof(CoverArtistOpacity), nameof(CoverArtistStrokeEnabled), nameof(CoverArtistStrokeBrush),
+        nameof(CoverArtistStrokeThickness),
     ];
 
     private static readonly IBrush TransparentBrush = new SolidColorBrush(Colors.Transparent);
@@ -94,6 +103,12 @@ public sealed class OverlayViewModel : ObservableObject
     /// <summary>当前曲目标识（Title|Artist）；仅真正切歌时变化。</summary>
     public string CoverTrackKey { get; private set; } = "";
 
+    /// <summary>切歌动画歌名（单行文本）。</summary>
+    public string CoverTitle { get; private set; } = "";
+
+    /// <summary>切歌动画歌手名（歌名下方独立行）。</summary>
+    public string CoverArtist { get; private set; } = "";
+
     private string _coverKey = "";
     private string _trackKeyCache = "";
     private bool _hadTrack;
@@ -149,8 +164,70 @@ public sealed class OverlayViewModel : ObservableObject
         if (t != null)
             _hadTrack = true;
         CoverTrackKey = key;
+        CoverTitle = t?.Title ?? "";
+        CoverArtist = t?.Artist ?? "";
         Raise(nameof(CoverTrackKey));
+        Raise(nameof(CoverTitle));
+        Raise(nameof(CoverArtist));
     }
+
+    // ---------- 切歌封面歌名样式（只读，供悬浮窗绑定） ----------
+
+    public bool CoverTitleEnabled => S.CoverTitleEnabled;
+
+    public bool CoverTitleShowArtist => S.CoverTitleShowArtist;
+
+    /// <summary>0=上方，1=下方，2=悬浮于封面。</summary>
+    public int CoverTitlePosition => Math.Clamp(S.CoverTitlePosition, 0, 2);
+
+    public double CoverAnimCoverOpacity => Math.Clamp(S.CoverAnimCoverOpacity, 0.1, 1);
+
+    public FontFamily CoverTitleFontFamily =>
+        ParseFont(S.CoverTitleFont) ?? FontFamilyValue;
+
+    public FontFamily CoverArtistFontFamily =>
+        ParseFont(S.CoverArtistFont) ?? FontFamilyValue;
+
+    public IBrush CoverTitleColor => ParseColor(S.CoverTitleColorHex, Colors.White);
+
+    public IBrush CoverArtistColor => ParseColor(S.CoverArtistColorHex, Colors.White);
+
+    public double CoverTitleFontSize => Math.Clamp(S.CoverTitleFontSize, 8, 120);
+
+    public double CoverArtistFontSize => Math.Clamp(S.CoverArtistFontSize, 8, 120);
+
+    public double CoverTitleOpacity => Math.Clamp(S.CoverTitleOpacity, 0.05, 1);
+
+    public double CoverArtistOpacity => Math.Clamp(S.CoverArtistOpacity, 0.05, 1);
+
+    public bool CoverTitleStrokeEnabled => S.CoverTitleStrokeEnabled;
+
+    public bool CoverArtistStrokeEnabled => S.CoverArtistStrokeEnabled;
+
+    public IBrush CoverTitleStrokeBrush => ParseColor(S.CoverTitleStrokeColorHex, Colors.Black);
+
+    public IBrush CoverArtistStrokeBrush => ParseColor(S.CoverArtistStrokeColorHex, Colors.Black);
+
+    public double CoverTitleStrokeThickness => Math.Clamp(S.CoverTitleStrokeThickness, 0.1, 4);
+
+    public double CoverArtistStrokeThickness => Math.Clamp(S.CoverArtistStrokeThickness, 0.1, 4);
+
+    private static FontFamily? ParseFont(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
+        try
+        {
+            return new FontFamily(name);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static IBrush ParseColor(string hex, Color fallback) =>
+        new SolidColorBrush(Color.TryParse(hex, out var c) ? c : fallback);
 
     private AppSettings S => _settings.Current;
 
