@@ -75,6 +75,32 @@ public sealed class AppSettings
     /// <summary>切歌封面最长显示时长（ms，歌词加载超时时强制结束）。</summary>
     public int CoverAnimMaxMs { get; set; } = 6000;
 
+    // ---- 切歌封面歌名 ----
+    /// <summary>切歌动画中在封面旁显示歌名（默认关）。</summary>
+    public bool CoverTitleEnabled { get; set; }
+    /// <summary>歌名下方同时显示歌手（分行）。</summary>
+    public bool CoverTitleShowArtist { get; set; } = true;
+    /// <summary>歌名位置：0=封面上方，1=封面下方，2=悬浮于封面之上。</summary>
+    public int CoverTitlePosition { get; set; }
+    /// <summary>悬浮模式下封面不透明度（0.1–1）。</summary>
+    public double CoverAnimCoverOpacity { get; set; } = 0.35;
+    // 歌名行
+    public string CoverTitleFont { get; set; } = "Microsoft YaHei UI";
+    public string CoverTitleColorHex { get; set; } = "#FFFFFF";
+    public double CoverTitleFontSize { get; set; } = 26;
+    public double CoverTitleOpacity { get; set; } = 1.0;
+    public bool CoverTitleStrokeEnabled { get; set; }
+    public string CoverTitleStrokeColorHex { get; set; } = "#000000";
+    public double CoverTitleStrokeThickness { get; set; } = 2;
+    // 歌手行
+    public string CoverArtistFont { get; set; } = "Microsoft YaHei UI";
+    public string CoverArtistColorHex { get; set; } = "#FFFFFF";
+    public double CoverArtistFontSize { get; set; } = 20;
+    public double CoverArtistOpacity { get; set; } = 0.8;
+    public bool CoverArtistStrokeEnabled { get; set; }
+    public string CoverArtistStrokeColorHex { get; set; } = "#000000";
+    public double CoverArtistStrokeThickness { get; set; } = 2;
+
     // ---- SMTC ----
     /// <summary>锁定监听的播放器 AUMID；null/空 = 自动跟随系统当前会话。</summary>
     public string? LockedSessionAumid { get; set; }

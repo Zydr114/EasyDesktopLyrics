@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia.Media;
 using EasyDesktopLyrics.Models;
 
 namespace EasyDesktopLyrics.ViewModels;
@@ -233,6 +234,198 @@ public sealed partial class SettingsViewModel
             var ms = (int)Math.Round(value * 1000);
             if (ms == _settings.Current.CoverAnimMaxMs) return;
             _settings.Update(s => s.CoverAnimMaxMs = ms);
+        }
+    }
+
+    // ---------- 切歌封面歌名 ----------
+
+    public bool CoverTitleEnabled
+    {
+        get => _settings.Current.CoverTitleEnabled;
+        set
+        {
+            if (value == _settings.Current.CoverTitleEnabled) return;
+            _settings.Update(s => s.CoverTitleEnabled = value);
+        }
+    }
+
+    public bool CoverTitleShowArtist
+    {
+        get => _settings.Current.CoverTitleShowArtist;
+        set
+        {
+            if (value == _settings.Current.CoverTitleShowArtist) return;
+            _settings.Update(s => s.CoverTitleShowArtist = value);
+        }
+    }
+
+    /// <summary>歌名位置选项：0=上方，1=下方，2=悬浮。</summary>
+    public IReadOnlyList<string> CoverTitlePositionOptions { get; } = ["上方", "下方", "悬浮于封面"];
+
+    public int CoverTitlePositionIndex
+    {
+        get => Math.Clamp(_settings.Current.CoverTitlePosition, 0, 2);
+        set => _settings.Update(s => s.CoverTitlePosition = Math.Clamp(value, 0, 2));
+    }
+
+    public double CoverAnimCoverOpacityVal
+    {
+        get => _settings.Current.CoverAnimCoverOpacity;
+        set
+        {
+            var v = Math.Round(value, 2);
+            if (Math.Abs(v - _settings.Current.CoverAnimCoverOpacity) < 0.01) return;
+            _settings.Update(s => s.CoverAnimCoverOpacity = v);
+        }
+    }
+
+    public string CoverTitleFont
+    {
+        get => _settings.Current.CoverTitleFont;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value) || value == _settings.Current.CoverTitleFont) return;
+            _settings.Update(s => s.CoverTitleFont = value);
+        }
+    }
+
+    public Color CoverTitleColorValue
+    {
+        get => Color.TryParse(_settings.Current.CoverTitleColorHex, out var c) ? c : Colors.White;
+        set
+        {
+            var hex = value.ToString().ToUpperInvariant();
+            if (hex == _settings.Current.CoverTitleColorHex) return;
+            _settings.Update(s => s.CoverTitleColorHex = hex);
+        }
+    }
+
+    public double CoverTitleFontSizeVal
+    {
+        get => _settings.Current.CoverTitleFontSize;
+        set
+        {
+            var v = Math.Round(value);
+            if (Math.Abs(v - _settings.Current.CoverTitleFontSize) < 0.5) return;
+            _settings.Update(s => s.CoverTitleFontSize = v);
+        }
+    }
+
+    public double CoverTitleOpacityVal
+    {
+        get => _settings.Current.CoverTitleOpacity;
+        set
+        {
+            var v = Math.Round(value, 2);
+            if (Math.Abs(v - _settings.Current.CoverTitleOpacity) < 0.01) return;
+            _settings.Update(s => s.CoverTitleOpacity = v);
+        }
+    }
+
+    public bool CoverTitleStrokeEnabled
+    {
+        get => _settings.Current.CoverTitleStrokeEnabled;
+        set
+        {
+            if (value == _settings.Current.CoverTitleStrokeEnabled) return;
+            _settings.Update(s => s.CoverTitleStrokeEnabled = value);
+        }
+    }
+
+    public Color CoverTitleStrokeColorValue
+    {
+        get => Color.TryParse(_settings.Current.CoverTitleStrokeColorHex, out var c) ? c : Colors.Black;
+        set
+        {
+            var hex = value.ToString().ToUpperInvariant();
+            if (hex == _settings.Current.CoverTitleStrokeColorHex) return;
+            _settings.Update(s => s.CoverTitleStrokeColorHex = hex);
+        }
+    }
+
+    public double CoverTitleStrokeThicknessVal
+    {
+        get => _settings.Current.CoverTitleStrokeThickness;
+        set
+        {
+            var v = Math.Round(value, 1);
+            if (Math.Abs(v - _settings.Current.CoverTitleStrokeThickness) < 0.05) return;
+            _settings.Update(s => s.CoverTitleStrokeThickness = v);
+        }
+    }
+
+    public string CoverArtistFont
+    {
+        get => _settings.Current.CoverArtistFont;
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value) || value == _settings.Current.CoverArtistFont) return;
+            _settings.Update(s => s.CoverArtistFont = value);
+        }
+    }
+
+    public Color CoverArtistColorValue
+    {
+        get => Color.TryParse(_settings.Current.CoverArtistColorHex, out var c) ? c : Colors.White;
+        set
+        {
+            var hex = value.ToString().ToUpperInvariant();
+            if (hex == _settings.Current.CoverArtistColorHex) return;
+            _settings.Update(s => s.CoverArtistColorHex = hex);
+        }
+    }
+
+    public double CoverArtistFontSizeVal
+    {
+        get => _settings.Current.CoverArtistFontSize;
+        set
+        {
+            var v = Math.Round(value);
+            if (Math.Abs(v - _settings.Current.CoverArtistFontSize) < 0.5) return;
+            _settings.Update(s => s.CoverArtistFontSize = v);
+        }
+    }
+
+    public double CoverArtistOpacityVal
+    {
+        get => _settings.Current.CoverArtistOpacity;
+        set
+        {
+            var v = Math.Round(value, 2);
+            if (Math.Abs(v - _settings.Current.CoverArtistOpacity) < 0.01) return;
+            _settings.Update(s => s.CoverArtistOpacity = v);
+        }
+    }
+
+    public bool CoverArtistStrokeEnabled
+    {
+        get => _settings.Current.CoverArtistStrokeEnabled;
+        set
+        {
+            if (value == _settings.Current.CoverArtistStrokeEnabled) return;
+            _settings.Update(s => s.CoverArtistStrokeEnabled = value);
+        }
+    }
+
+    public Color CoverArtistStrokeColorValue
+    {
+        get => Color.TryParse(_settings.Current.CoverArtistStrokeColorHex, out var c) ? c : Colors.Black;
+        set
+        {
+            var hex = value.ToString().ToUpperInvariant();
+            if (hex == _settings.Current.CoverArtistStrokeColorHex) return;
+            _settings.Update(s => s.CoverArtistStrokeColorHex = hex);
+        }
+    }
+
+    public double CoverArtistStrokeThicknessVal
+    {
+        get => _settings.Current.CoverArtistStrokeThickness;
+        set
+        {
+            var v = Math.Round(value, 1);
+            if (Math.Abs(v - _settings.Current.CoverArtistStrokeThickness) < 0.05) return;
+            _settings.Update(s => s.CoverArtistStrokeThickness = v);
         }
     }
 
