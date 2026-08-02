@@ -20,16 +20,18 @@ public sealed partial class SettingsWindow : Window
         [
             new PlaySettingsView(),
             new AppearanceSettingsView(),
+            new TextEffectsSettingsView(),
+            new CoverSettingsView(),
             new DisplaySettingsView(),
             new FixSettingsView(),
         ];
-        ContentHost.Content = _views[Math.Clamp(vm.SelectedNav, 0, 3)];
+        ContentHost.Content = _views[Math.Clamp(vm.SelectedNav, 0, 5)];
 
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(SettingsViewModel.SelectedNav))
             {
-                ContentHost.Content = _views[Math.Clamp(_vm.SelectedNav, 0, 3)];
+                ContentHost.Content = _views[Math.Clamp(_vm.SelectedNav, 0, 5)];
                 ContentScroll.Offset = Vector.Zero;
             }
         };

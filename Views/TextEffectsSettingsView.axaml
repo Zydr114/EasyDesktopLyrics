@@ -1,0 +1,134 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:EasyDesktopLyrics.ViewModels"
+             xmlns:local="using:EasyDesktopLyrics.Views"
+             x:Class="EasyDesktopLyrics.Views.TextEffectsSettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+  <StackPanel Spacing="12">
+    <!-- 特效 -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="cardTitle" Text="文字特效" />
+          <TextBlock Classes="cardDesc" Text="阴影、描边与辉光可同时启用，增强任意背景下的可读性。" />
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+          <CheckBox Content="文字阴影" IsChecked="{Binding ShadowEnabled, Mode=TwoWay}" />
+          <Border IsVisible="{Binding ShadowEnabled}" Margin="20,0,0,0">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="阴影颜色" />
+                <local:ColorPicker Grid.Column="1" Color="{Binding ShadowColorValue, Mode=TwoWay}" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                <TextBlock Classes="sectionLabel" Text="模糊半径" />
+                <Slider Grid.Column="1" Minimum="1" Maximum="40" TickFrequency="1"
+                        Value="{Binding ShadowBlurVal, Mode=TwoWay}" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding ShadowBlurVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                <TextBlock Classes="sectionLabel" Text="垂直偏移" />
+                <Slider Grid.Column="1" Minimum="-20" Maximum="20" TickFrequency="1"
+                        Value="{Binding ShadowOffsetYVal, Mode=TwoWay}" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding ShadowOffsetYVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+              </Grid>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <Separator />
+
+        <StackPanel Spacing="6">
+          <CheckBox Content="文字描边（已唱段）" IsChecked="{Binding StrokeEnabled, Mode=TwoWay}" />
+          <Border IsVisible="{Binding StrokeEnabled}" Margin="20,0,0,0">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="描边颜色" />
+                <local:ColorPicker Grid.Column="1" Color="{Binding StrokeColorValue, Mode=TwoWay}" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                <TextBlock Classes="sectionLabel" Text="描边宽度" />
+                <Slider Grid.Column="1" Minimum="0.1" Maximum="4" TickFrequency="0.1"
+                        Value="{Binding StrokeThicknessVal, Mode=TwoWay}" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding StrokeThicknessVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+              </Grid>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+          <CheckBox Content="文字描边（未唱段）" IsChecked="{Binding InactiveStrokeEnabled, Mode=TwoWay}" />
+          <Border IsVisible="{Binding InactiveStrokeEnabled}" Margin="20,0,0,0">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="描边颜色" />
+                <local:ColorPicker Grid.Column="1" Color="{Binding InactiveStrokeColorValue, Mode=TwoWay}" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                <TextBlock Classes="sectionLabel" Text="描边宽度" />
+                <Slider Grid.Column="1" Minimum="0.1" Maximum="4" TickFrequency="0.1"
+                        Value="{Binding InactiveStrokeThicknessVal, Mode=TwoWay}" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding InactiveStrokeThicknessVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+              </Grid>
+            </StackPanel>
+          </Border>
+          <TextBlock Text="关闭时未唱段无描边，保证逐字高亮的明暗对比不被整行描边抹平。宽度独立于已唱段。" FontSize="11" Opacity="0.6" />
+        </StackPanel>
+
+        <Separator />
+
+        <StackPanel Spacing="6">
+          <CheckBox Content="辉光（已唱段）" IsChecked="{Binding GlowEnabled, Mode=TwoWay}" />
+          <Border IsVisible="{Binding GlowEnabled}" Margin="20,0,0,0">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="辉光颜色" />
+                <local:ColorPicker Grid.Column="1" Color="{Binding GlowColorValue, Mode=TwoWay}" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                <TextBlock Classes="sectionLabel" Text="辉光强度" />
+                <Slider Grid.Column="1" Minimum="4" Maximum="16" TickFrequency="1"
+                        Value="{Binding GlowRadiusVal, Mode=TwoWay}" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding GlowRadiusVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+              </Grid>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+          <CheckBox Content="辉光（未唱段）" IsChecked="{Binding InactiveGlowEnabled, Mode=TwoWay}" />
+          <Border IsVisible="{Binding InactiveGlowEnabled}" Margin="20,0,0,0">
+            <StackPanel Spacing="8">
+              <Grid ColumnDefinitions="90,*" ColumnSpacing="10">
+                <TextBlock Classes="sectionLabel" Text="辉光颜色" />
+                <local:ColorPicker Grid.Column="1" Color="{Binding InactiveGlowColorValue, Mode=TwoWay}" />
+              </Grid>
+              <Grid ColumnDefinitions="90,*,64" ColumnSpacing="14">
+                <TextBlock Classes="sectionLabel" Text="辉光强度" />
+                <Slider Grid.Column="1" Minimum="4" Maximum="16" TickFrequency="1"
+                        Value="{Binding InactiveGlowRadiusVal, Mode=TwoWay}" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding InactiveGlowRadiusVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+              </Grid>
+            </StackPanel>
+          </Border>
+          <TextBlock Text="默认关闭：光晕只照亮已唱段。强度独立于已唱段辉光。" FontSize="11" Opacity="0.6" />
+        </StackPanel>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+
+</UserControl>

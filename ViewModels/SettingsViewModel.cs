@@ -169,14 +169,18 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     [
         new("\uE768", "播放"),
         new("\uE790", "外观"),
+        new("\uE762", "文字特效"),
+        new("\uE7B5", "歌词封面"),
         new("\uE7C4", "显示"),
         new("\uE8FD", "校正"),
     ];
 
     public bool PlayNavSelected => _selectedNav == 0;
     public bool AppearanceNavSelected => _selectedNav == 1;
-    public bool DisplayNavSelected => _selectedNav == 2;
-    public bool FixNavSelected => _selectedNav == 3;
+    public bool EffectsNavSelected => _selectedNav == 2;
+    public bool CoverNavSelected => _selectedNav == 3;
+    public bool DisplayNavSelected => _selectedNav == 4;
+    public bool FixNavSelected => _selectedNav == 5;
 
     private int _selectedNav;
 
@@ -187,6 +191,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         {
             if (Set(ref _selectedNav, value))
                 RaiseMany([nameof(PlayNavSelected), nameof(AppearanceNavSelected),
+                           nameof(EffectsNavSelected), nameof(CoverNavSelected),
                            nameof(DisplayNavSelected), nameof(FixNavSelected)]);
         }
     }
