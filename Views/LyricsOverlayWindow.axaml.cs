@@ -143,9 +143,9 @@ public sealed partial class LyricsOverlayWindow : Window
         if (_transGrid.Bounds.Height > 0)
             h += _transGrid.Bounds.Height + _vm.LineSpacing;
         h = Math.Max(h, Cover.Bounds.Height);
-        // 动画期间歌名显示在封面下方：窗口容纳封面 + 间距 + 歌名区
+        // 动画期间歌名显示在封面下方：窗口容纳封面目标高度（行高×3）+ 间距 + 歌名区
         if (_coverAnimating && CoverTitleBox.IsVisible && CoverTitleBox.Bounds.Height > 0)
-            h = Math.Max(h, Cover.Bounds.Height + 8 + CoverTitleBox.Bounds.Height);
+            h = Math.Max(h, _coverAnimSize + 8 + CoverTitleBox.Bounds.Height);
         return h + ControlBar.Height + 12; // 12 = Border padding 6×2
     }
 
@@ -548,23 +548,24 @@ public sealed partial class LyricsOverlayWindow : Window
         }
     }
 
-    /// <summary>歌名进入布局（仅动画期间调用）：显示在封面下方并淡入；开关关闭时不进入。</summary>
+    /// <summary>歌名进入布局（仅动画期间调用）：从封面下方目标位稍远处滑入并淡入；开关关闭时不进入。</summary>
     private void EnterCoverTitle()
     {
         if (!_vm.CoverTitleEnabled)
             return;
         CoverTitleBox.IsVisible = true;
-        UpdateCoverTitlePosition();
+        UpdateCoverTitlePosition(yOffset: 12); // 从最终位置下方 12px 滑入
         CoverTitleBox.Opacity = 1;
+        _coverPosDirty = true; // 首轮布局后校正到最终位置（RenderTransform 过渡平滑滑入）
     }
 
-    /// <summary>歌名淡出（250ms）后退出布局；快速切歌时跳过，避免误关新歌名。</summary>
+    /// <summary>歌名淡出（400ms）后退出布局；快速切歌时跳过，避免误关新歌名。</summary>
     private void ExitCoverTitle()
     {
         CoverTitleBox.Opacity = 0;
         _ = Task.Run(async () =>
         {
-            await Task.Delay(300); // 等待淡出过渡完成
+            await Task.Delay(450); // 等待淡出过渡完成
             Dispatcher.UIThread.Post(() =>
             {
                 if (_coverAnimating)
@@ -574,15 +575,18 @@ public sealed partial class LyricsOverlayWindow : Window
         });
     }
 
-    /// <summary>歌名定位：水平居中于窗口（与封面同轴），垂直位于封面下边框下方（不跟随封面动画路径）。</summary>
-    private void UpdateCoverTitlePosition()
+    /// <summary>
+    /// 歌名定位：水平居中于窗口（与封面同轴）；垂直 = 封面目标高度（动画期间 = 行高×3）下方，
+    /// 不依赖封面过渡中的实时尺寸 → 歌名始终位于最终封面下方，不悬浮覆盖在封面上。
+    /// </summary>
+    private void UpdateCoverTitlePosition(double yOffset = 0)
     {
         if (!CoverTitleBox.IsVisible)
             return;
         const double gap = 8;
         var x = Math.Max(0, (OuterGrid.Bounds.Width - CoverTitleBox.Bounds.Width) / 2);
-        var y = Cover.Bounds.Height + gap;
-        CoverTitleBox.RenderTransform = Translate(x, y);
+        var y = (_coverAnimating ? _coverAnimSize : Cover.Bounds.Height) + gap;
+        CoverTitleBox.RenderTransform = Translate(x, y + yOffset);
     }
 
     private void SetLyricsOpacity(double opacity) => LyricsViewbox.Opacity = opacity;

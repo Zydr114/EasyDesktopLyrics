@@ -62,7 +62,8 @@
                IsHitTestVisible="False" IsVisible="False" Opacity="0">
         <Viewbox.Transitions>
           <Transitions>
-            <DoubleTransition Property="Opacity" Duration="0:0:0.25" Easing="QuadraticEaseOut" />
+            <DoubleTransition Property="Opacity" Duration="0:0:0.4" Easing="QuadraticEaseOut" />
+            <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.45" Easing="QuadraticEaseOut" />
           </Transitions>
         </Viewbox.Transitions>
         <StackPanel Spacing="4" HorizontalAlignment="Center">
