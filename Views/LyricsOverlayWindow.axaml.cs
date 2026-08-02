@@ -44,6 +44,7 @@ public sealed partial class LyricsOverlayWindow : Window
     private int _lastGrowBottom;
     private bool _lastCoverEnabled;
     private double _lastCoverSizePct;
+    private bool _lastCoverTitleEnabled;
 
     // 动态文本层
     private Grid _mainGrid = null!;
@@ -127,6 +128,7 @@ public sealed partial class LyricsOverlayWindow : Window
 
         _lastCoverEnabled = _vm.CoverEnabled;
         _lastCoverSizePct = _vm.CoverSizePct;
+        _lastCoverTitleEnabled = _vm.CoverTitleEnabled;
         LyricsArea.MinWidth = _vm.MaxTextWidth;
 
         _mainGrid.SizeChanged += (_, _) => UpdateCoverSize();
@@ -421,9 +423,12 @@ public sealed partial class LyricsOverlayWindow : Window
             ApplyGlow();
         else if (e.PropertyName == nameof(OverlayViewModel.TextAlignment))
             ApplyAlignment();
-        else if (e.PropertyName is nameof(OverlayViewModel.CoverTitleEnabled))
+        else if (e.PropertyName == nameof(OverlayViewModel.CoverTitleEnabled))
         {
-            // 动画中切换开关：即时进入/退出歌名
+            // StateChanged 广播频繁且值可能未变：仅值真正变化时才处理，避免动画中反复重启滑入过渡
+            if (_vm.CoverTitleEnabled == _lastCoverTitleEnabled)
+                return;
+            _lastCoverTitleEnabled = _vm.CoverTitleEnabled;
             if (_coverAnimating)
             {
                 if (_vm.CoverTitleEnabled)
