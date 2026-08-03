@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="Assets/app.png" width="88" alt="EasyDesktopLyrics" />
+</p>
+
 # EasyDesktopLyrics
 
 Windows 桌面歌词工具。通过 [SMTC](https://learn.microsoft.com/windows/uwp/audio-video-camera/system-media-transport-controls) 跟随外部播放器同步显示歌词，歌词窗口常驻桌面并支持鼠标穿透（锁定后完全不挡操作），透明、轻量、即开即用。
@@ -5,6 +9,22 @@ Windows 桌面歌词工具。通过 [SMTC](https://learn.microsoft.com/windows/u
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%202004+-blue)
 ![.NET](https://img.shields.io/badge/.NET-10-512BD4)
 ![Avalonia](https://img.shields.io/badge/Avalonia-12.1-8A2BE2)
+
+## 截图
+
+歌词窗口不透明显示时随歌名/歌手变化，多行歌词 + 逐字高亮：
+
+| 歌词窗口（无常驻封面） | 歌词窗口（含常驻封面） |
+|:---:|:---:|
+| ![overlay1](screenshots/overlay1.png) | ![overlay2](screenshots/overlay2.png) |
+
+悬停歌词窗口时出现的播放控制胶囊（上一曲 / 播放暂停 / 下一曲）：
+
+![overlay3](screenshots/overlay3.png)
+
+设置界面（外观、文字特效、歌词封面、行间动效、歌词来源等）：
+
+![setting](screenshots/setting.png)
 
 ## 功能
 
