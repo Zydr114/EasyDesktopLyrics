@@ -28,11 +28,19 @@ Windows 桌面歌词工具。通过 [SMTC](https://learn.microsoft.com/windows/u
 
 ## 使用
 
-1. 从 [Release](https://github.com/Zydr114/EasyDesktopLyrics/releases) 下载压缩包，解压后双击 `EasyDesktopLyrics.exe`。
-2. 打开任意支持的播放器开始播放，歌词窗口自动出现。
-3. 托盘图标 → 锁定歌词（鼠标穿透），歌词即完全悬浮于桌面。
+每个版本发布两种包，按需选择其一：
 
-> 发行包为绿色目录（框架依赖），要求已安装 .NET 10 Runtime；首次运行会自动从各来源拉取歌词并缓存到 `%APPDATA%\EasyDesktopLyrics\`。
+| 包 | 说明 |
+|------|------|
+| `EasyDesktopLyrics-<版本>-win-x64.zip` | **轻量版**（框架依赖，约 45MB），需已安装 .NET 10 Runtime |
+| `EasyDesktopLyrics-<版本>-win-x64-standalone.zip` | **自包含版**（约 50MB），内置 .NET 10 运行时，免安装直接运行，零依赖 |
+
+下载解压后双击 `EasyDesktopLyrics.exe` 即可：
+
+1. 打开任意支持的播放器开始播放，歌词窗口自动出现。
+2. 托盘图标 → 锁定歌词（鼠标穿透），歌词即完全悬浮于桌面。
+
+> 首次运行会自动从各来源拉取歌词并缓存到 `%APPDATA%\EasyDesktopLyrics\`。
 
 ## 构建
 
@@ -43,8 +51,11 @@ git clone https://github.com/Zydr114/EasyDesktopLyrics.git
 cd EasyDesktopLyrics
 dotnet build -c Release
 
-# 发布绿色目录包（win-x64，框架依赖，与 Release 一致）
+# 轻量版（框架依赖，需目标机安装 .NET 10 Runtime）
 dotnet publish -c Release -r win-x64 --self-contained false
+
+# 自包含单文件版（内置运行时，零依赖；取 publish 目录中的 EasyDesktopLyrics.exe 打包）
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true
 ```
 
 ## 歌词来源
