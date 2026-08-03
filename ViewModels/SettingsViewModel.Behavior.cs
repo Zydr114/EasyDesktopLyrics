@@ -85,6 +85,143 @@ public sealed partial class SettingsViewModel
         }
     }
 
+    // ---------- 行间切换动效 ----------
+
+    public bool LineTransitionEnabled
+    {
+        get => _settings.Current.LineTransitionEnabled;
+        set
+        {
+            if (value == _settings.Current.LineTransitionEnabled) return;
+            _settings.Update(s => s.LineTransitionEnabled = value);
+        }
+    }
+
+    public IReadOnlyList<string> LineTransitionTypeOptions { get; } =
+        ["淡入", "位移淡入", "缩放弹入", "交叉淡化", "逐字显现", "扫光"];
+
+    private static readonly string[] LineTransitionTypeValues =
+        ["Fade", "Slide", "Scale", "Crossfade", "Reveal", "Shine"];
+
+    public int LineTransitionTypeIndex
+    {
+        get => Math.Clamp(Array.IndexOf(LineTransitionTypeValues, _settings.Current.LineTransitionType),
+            0, LineTransitionTypeValues.Length - 1);
+        set
+        {
+            if (value < 0 || value >= LineTransitionTypeValues.Length) return;
+            _settings.Update(s => s.LineTransitionType = LineTransitionTypeValues[value]);
+        }
+    }
+
+    /// <summary>
+    /// 行间动效速度（倍速：1.0x = 默认 400ms，数值越大越快，低于 1.0x 更慢）。
+    /// 内部换算为时长：durationMs = clamp(round(400 / 倍速), 80, 1500)。
+    /// </summary>
+    public double LineTransitionSpeedVal
+    {
+        get
+        {
+            var ms = Math.Clamp(_settings.Current.LineTransitionDurationMs, 80, 1500);
+            return Math.Round(400.0 / ms, 1);
+        }
+        set
+        {
+            var speed = Math.Clamp(value, 0.3, 5);
+            var ms = Math.Clamp((int)Math.Round(400.0 / speed), 80, 1500);
+            if (ms == _settings.Current.LineTransitionDurationMs) return;
+            _settings.Update(s => s.LineTransitionDurationMs = ms);
+        }
+    }
+
+    /// <summary>位移淡入的专属设置是否显示（仅 Slide 类型）。</summary>
+    public bool ShowSlideOptions => _settings.Current.LineTransitionType == "Slide";
+
+    /// <summary>缩放弹入的专属设置是否显示（仅 Scale 类型）。</summary>
+    public bool ShowScaleOptions => _settings.Current.LineTransitionType == "Scale";
+
+    /// <summary>缩放弹入起始缩放比例（0.3–0.95）。</summary>
+    public double LineTransitionScaleVal
+    {
+        get => _settings.Current.LineTransitionScale;
+        set
+        {
+            var v = Math.Round(value, 2);
+            if (Math.Abs(v - _settings.Current.LineTransitionScale) < 0.01) return;
+            _settings.Update(s => s.LineTransitionScale = Math.Clamp(v, 0.3, 0.95));
+        }
+    }
+
+    /// <summary>缩放弹入的旧行退场：放大淡出 / 直接淡出。</summary>
+    public bool LineTransitionScaleExitGrow
+    {
+        get => _settings.Current.LineTransitionScaleExitGrow;
+        set
+        {
+            if (value == _settings.Current.LineTransitionScaleExitGrow) return;
+            _settings.Update(s => s.LineTransitionScaleExitGrow = value);
+        }
+    }
+
+    /// <summary>位移淡入入场模糊开关。</summary>
+    public bool LineTransitionSlideBlurEnabled
+    {
+        get => _settings.Current.LineTransitionSlideBlurEnabled;
+        set
+        {
+            if (value == _settings.Current.LineTransitionSlideBlurEnabled) return;
+            _settings.Update(s => s.LineTransitionSlideBlurEnabled = value);
+        }
+    }
+
+    /// <summary>位移淡入入场模糊半径（px，0–20）。</summary>
+    public double LineTransitionSlideBlurRadiusVal
+    {
+        get => _settings.Current.LineTransitionSlideBlurRadius;
+        set
+        {
+            var v = Math.Round(value);
+            if (Math.Abs(v - _settings.Current.LineTransitionSlideBlurRadius) < 0.5) return;
+            _settings.Update(s => s.LineTransitionSlideBlurRadius = Math.Clamp(v, 0, 20));
+        }
+    }
+
+    /// <summary>行间动效缓动选项（复用封面动画的缓动清单）。</summary>
+    public IReadOnlyList<string> LineTransitionEasingOptions => CoverAnimEasingOptions;
+
+    public int LineTransitionEasingIndex
+    {
+        get => Math.Clamp(Array.IndexOf(CoverAnimEasingValues, _settings.Current.LineTransitionEasing),
+            0, CoverAnimEasingValues.Length - 1);
+        set
+        {
+            if (value < 0 || value >= CoverAnimEasingValues.Length) return;
+            _settings.Update(s => s.LineTransitionEasing = CoverAnimEasingValues[value]);
+        }
+    }
+
+    /// <summary>滑入方向选项：0=无位移，1=上，2=下，3=左，4=右。</summary>
+    public IReadOnlyList<string> LineTransitionDirectionOptions { get; } =
+        ["无位移", "从上方", "从下方", "从左侧", "从右侧"];
+
+    public int LineTransitionDirectionIndex
+    {
+        get => Math.Clamp(_settings.Current.LineTransitionDirection, 0, 4);
+        set => _settings.Update(s => s.LineTransitionDirection = Math.Clamp(value, 0, 4));
+    }
+
+    /// <summary>滑入位移强度（px）。</summary>
+    public double LineTransitionDistanceVal
+    {
+        get => _settings.Current.LineTransitionDistance;
+        set
+        {
+            var v = Math.Round(value);
+            if (Math.Abs(v - _settings.Current.LineTransitionDistance) < 0.5) return;
+            _settings.Update(s => s.LineTransitionDistance = Math.Clamp(v, 0, 60));
+        }
+    }
+
     // ---------- 播放器优先级 ----------
     public ObservableCollection<PlayerRuleItem> PlayerRules { get; } = [];
 

@@ -65,11 +65,15 @@ public sealed class OverlayViewModel : ObservableObject
             RefreshCoverTrackKey();
             RaiseMany(AllProps);
         };
+        _orchestrator.LineChanged += suppress => LineChanged?.Invoke(suppress);
 
         PlayPauseCommand = new RelayCommand(() => _ = _smtc.TryTogglePlayPauseAsync());
         PrevCommand = new RelayCommand(() => _ = _smtc.TrySkipPreviousAsync());
         NextCommand = new RelayCommand(() => _ = _smtc.TrySkipNextAsync());
     }
+
+    /// <summary>当前行切换（bool = 是否抑制行间动效，如切歌/seek）。UI 线程回调。</summary>
+    public event Action<bool>? LineChanged;
 
     public RelayCommand PlayPauseCommand { get; }
 

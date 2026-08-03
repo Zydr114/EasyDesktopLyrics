@@ -28,6 +28,78 @@
       </StackPanel>
     </Border>
 
+    <!-- 行间切换动效 -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="cardTitle" Text="行间切换动效" />
+          <TextBlock Classes="cardDesc" Text="歌词行切换时的进入动画；关闭 = 即时切换（默认）。部分设置仅对对应动效生效。" />
+        </StackPanel>
+        <Grid ColumnDefinitions="140,*" ColumnSpacing="10"
+              RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6">
+          <TextBlock Classes="sectionLabel" Text="开启动效" />
+          <ToggleSwitch Grid.Column="1" IsChecked="{Binding LineTransitionEnabled, Mode=TwoWay}" />
+          <TextBlock Classes="sectionLabel" Text="动效类型" Grid.Row="1" />
+          <ComboBox Grid.Column="1" Grid.Row="1" ItemsSource="{Binding LineTransitionTypeOptions}"
+                    SelectedIndex="{Binding LineTransitionTypeIndex, Mode=TwoWay}" Width="160"
+                    HorizontalAlignment="Left" />
+          <TextBlock Classes="sectionLabel" Text="速度 (倍速)" Grid.Row="2" />
+          <Grid Grid.Column="1" Grid.Row="2" ColumnDefinitions="*,64" ColumnSpacing="14">
+            <Slider Minimum="0.3" Maximum="5" TickFrequency="0.1"
+                    Value="{Binding LineTransitionSpeedVal, Mode=TwoWay}" />
+            <TextBox Grid.Column="1" MinHeight="28" Padding="8,2"
+                     Text="{Binding LineTransitionSpeedVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                     TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+          </Grid>
+          <TextBlock Classes="sectionLabel" Text="缓动曲线" Grid.Row="3" />
+          <ComboBox Grid.Column="1" Grid.Row="3" ItemsSource="{Binding LineTransitionEasingOptions}"
+                    SelectedIndex="{Binding LineTransitionEasingIndex, Mode=TwoWay}" Width="160"
+                    HorizontalAlignment="Left" />
+
+          <!-- 位移淡入专属 -->
+          <TextBlock Classes="sectionLabel" Text="滑入方向" Grid.Row="4" IsVisible="{Binding ShowSlideOptions}" />
+          <ComboBox Grid.Column="1" Grid.Row="4" ItemsSource="{Binding LineTransitionDirectionOptions}"
+                    SelectedIndex="{Binding LineTransitionDirectionIndex, Mode=TwoWay}" Width="160"
+                    HorizontalAlignment="Left" IsVisible="{Binding ShowSlideOptions}" />
+          <TextBlock Classes="sectionLabel" Text="位移距离 (px)" Grid.Row="5" IsVisible="{Binding ShowSlideOptions}" />
+          <Grid Grid.Column="1" Grid.Row="5" ColumnDefinitions="*,64" ColumnSpacing="14"
+                IsVisible="{Binding ShowSlideOptions}">
+            <Slider Minimum="0" Maximum="60" TickFrequency="2"
+                    Value="{Binding LineTransitionDistanceVal, Mode=TwoWay}" />
+            <TextBox Grid.Column="1" MinHeight="28" Padding="8,2"
+                     Text="{Binding LineTransitionDistanceVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                     TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+          </Grid>
+          <TextBlock Classes="sectionLabel" Text="入场模糊" Grid.Row="6" IsVisible="{Binding ShowSlideOptions}" />
+          <ToggleSwitch Grid.Column="1" Grid.Row="6" IsChecked="{Binding LineTransitionSlideBlurEnabled, Mode=TwoWay}"
+                        IsVisible="{Binding ShowSlideOptions}" />
+          <TextBlock Classes="sectionLabel" Text="模糊半径 (px)" Grid.Row="7" IsVisible="{Binding ShowSlideOptions}" />
+          <Grid Grid.Column="1" Grid.Row="7" ColumnDefinitions="*,64" ColumnSpacing="14"
+                IsVisible="{Binding ShowSlideOptions}">
+            <Slider Minimum="0" Maximum="20" TickFrequency="1"
+                    Value="{Binding LineTransitionSlideBlurRadiusVal, Mode=TwoWay}" />
+            <TextBox Grid.Column="1" MinHeight="28" Padding="8,2"
+                     Text="{Binding LineTransitionSlideBlurRadiusVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                     TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+          </Grid>
+
+          <!-- 缩放弹入专属 -->
+          <TextBlock Classes="sectionLabel" Text="起始缩放" Grid.Row="8" IsVisible="{Binding ShowScaleOptions}" />
+          <Grid Grid.Column="1" Grid.Row="8" ColumnDefinitions="*,64" ColumnSpacing="14"
+                IsVisible="{Binding ShowScaleOptions}">
+            <Slider Minimum="0.3" Maximum="0.95" TickFrequency="0.01"
+                    Value="{Binding LineTransitionScaleVal, Mode=TwoWay}" />
+            <TextBox Grid.Column="1" MinHeight="28" Padding="8,2"
+                     Text="{Binding LineTransitionScaleVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                     TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+          </Grid>
+          <TextBlock Classes="sectionLabel" Text="旧行退场" Grid.Row="9" IsVisible="{Binding ShowScaleOptions}" />
+          <ToggleSwitch Grid.Column="1" Grid.Row="9" IsChecked="{Binding LineTransitionScaleExitGrow, Mode=TwoWay}"
+                        IsVisible="{Binding ShowScaleOptions}" />
+        </Grid>
+      </StackPanel>
+    </Border>
+
     <!-- 系统 -->
     <Border Classes="card">
       <StackPanel Spacing="10">

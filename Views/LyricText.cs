@@ -45,6 +45,14 @@ public sealed class LyricText : Control
     public static readonly StyledProperty<ClipSideMode> HighlightClipProperty =
         AvaloniaProperty.Register<LyricText, ClipSideMode>(nameof(HighlightClip), ClipSideMode.None);
 
+    /// <summary>行进入逐字显现进度 0~1（从左到右逐个字符点亮）；-1 = 禁用（正常渲染）。</summary>
+    public static readonly StyledProperty<double> EnterProgressProperty =
+        AvaloniaProperty.Register<LyricText, double>(nameof(EnterProgress), -1);
+
+    /// <summary>扫光带位置进度 0~1（亮带沿行从左到右扫描）；-1 = 禁用。</summary>
+    public static readonly StyledProperty<double> ShineProgressProperty =
+        AvaloniaProperty.Register<LyricText, double>(nameof(ShineProgress), -1);
+
     public static readonly StyledProperty<FontFamily> FontFamilyProperty =
         AvaloniaProperty.Register<LyricText, FontFamily>(nameof(FontFamily), FontFamily.Default);
 
@@ -100,7 +108,8 @@ public sealed class LyricText : Control
             FillProperty, InactiveFillProperty, StrokeBrushProperty, StrokeEnabledProperty,
             StrokeThicknessProperty, InactiveStrokeEnabledProperty, InactiveStrokeBrushProperty,
             TextAlignmentProperty, HighlightLengthProperty, HighlightFractionProperty,
-            HighlightClipProperty, MaxTextWidthProperty);
+            HighlightClipProperty, MaxTextWidthProperty,
+            EnterProgressProperty, ShineProgressProperty);
     }
 
     public string? Text
@@ -125,6 +134,18 @@ public sealed class LyricText : Control
     {
         get => GetValue(HighlightClipProperty);
         set => SetValue(HighlightClipProperty, value);
+    }
+
+    public double EnterProgress
+    {
+        get => GetValue(EnterProgressProperty);
+        set => SetValue(EnterProgressProperty, value);
+    }
+
+    public double ShineProgress
+    {
+        get => GetValue(ShineProgressProperty);
+        set => SetValue(ShineProgressProperty, value);
     }
 
     public FontFamily FontFamily
@@ -227,6 +248,22 @@ public sealed class LyricText : Control
 
         var thickness = StrokeEnabled ? StrokeThickness : 0;
 
+        // 扫光层：整行按亮带遮罩绘制（亮带位置由 ShineProgress 驱动，独立于逐字/描边分支）。
+        if (ShineProgress >= 0 && ShineProgress <= 1)
+        {
+            var band = BuildBand(ShineProgress, body.Width);
+            if (band != null)
+            {
+                using (context.PushOpacityMask(band, new Rect(0, 0, body.Width, body.Height)))
+                    body.Draw(context, new Point());
+            }
+            else
+            {
+                DrawBody(context, body, thickness);
+            }
+            return;
+        }
+
         // 平涂路径（无逐字数据 / 单色层）：整行单色。
         // 无逐字数据时没有"未唱段"概念 → 未唱侧层（Right：未唱层/未唱辉光）整体不绘制，
         // 否则未唱色/未唱辉光会作用到整行（非逐字歌词也被未唱辉光照亮）。
@@ -310,14 +347,55 @@ public sealed class LyricText : Control
         _charLeft = BuildCharLefts(_bodyLayout, text);
     }
 
-    /// <summary>平涂模式：无逐字数据（HighlightLength &lt; 0）或文本为空 → 整行单色。</summary>
+    /// <summary>平涂模式：无逐字数据（HighlightLength &lt; 0）且未处于逐字显现进入中 → 整行单色。</summary>
     private bool IsFlatMode
     {
         get
         {
             var text = Text;
-            return string.IsNullOrEmpty(text) || HighlightLength < 0;
+            if (string.IsNullOrEmpty(text))
+                return true;
+            var entering = EnterProgress >= 0 && EnterProgress <= 1;
+            return HighlightLength < 0 && !entering;
         }
+    }
+
+    /// <summary>
+    /// 有效逐字进度：进入显现中由 EnterProgress 驱动（从左到右点亮字符），
+    /// 否则用卡拉 OK 的 HighlightLength/HighlightFraction。
+    /// </summary>
+    private (int Done, double Frac) EffectiveHighlight(int len)
+    {
+        if (EnterProgress >= 0 && EnterProgress <= 1)
+        {
+            var p = Math.Clamp(EnterProgress, 0, 1);
+            var total = p * len;
+            var done = (int)total;
+            return (done, total - done);
+        }
+        return (Math.Clamp(HighlightLength, 0, len), Math.Clamp(HighlightFraction, 0, 1));
+    }
+
+    /// <summary>扫光带渐变（亮带遮罩，只取 alpha）：位置随 progress 0~1 从左到右，软边光带。</summary>
+    private static IBrush? BuildBand(double progress, double width)
+    {
+        if (width <= 0)
+            return null;
+        var pos = Math.Clamp(progress, 0, 1) * width;
+        var bandW = Math.Max(24, width * 0.08);
+        var stops = new List<GradientStop>(5);
+        AddStop(stops, 0, Colors.Transparent);
+        AddStop(stops, Math.Max(0, (pos - bandW) / width), Colors.Transparent);
+        AddStop(stops, pos / width, Colors.Black);
+        AddStop(stops, Math.Min(1, (pos + bandW) / width), Colors.Transparent);
+        AddStop(stops, 1, Colors.Transparent);
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new RelativePoint(0, 0, RelativeUnit.Absolute),
+            EndPoint = new RelativePoint(width, 0, RelativeUnit.Absolute),
+        };
+        brush.GradientStops.AddRange(stops);
+        return brush;
     }
 
     /// <summary>逐字左缘 X（相对行首），末位为整行宽度；供渐变 stop 定位。</summary>
@@ -350,8 +428,7 @@ public sealed class LyricText : Control
         if (len <= 0)
             return null;
 
-        var done = Math.Clamp(HighlightLength, 0, len);
-        var frac = Math.Clamp(HighlightFraction, 0, 1);
+        var (done, frac) = EffectiveHighlight(len);
         var width = layout.Width;
         if (width <= 0)
             return null;
