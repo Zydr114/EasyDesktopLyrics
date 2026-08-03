@@ -31,6 +31,7 @@ public sealed partial class LyricsOverlayWindow : Window
     private readonly DispatcherTimer _coverStageTimer;
     private readonly DispatcherTimer _coverTimeoutTimer;
     private readonly UiDebouncer _anchorDebouncer = new();
+    private readonly UiDebouncer _initialAnchorDebouncer = new();
 
     private IntPtr _hwnd;
     private bool _locked;
@@ -83,6 +84,13 @@ public sealed partial class LyricsOverlayWindow : Window
         _settingsService = settingsService;
 
         BuildTextLayers();
+
+        // 初始封面占位尺寸：未运行 UpdateCoverSize 前封面会按原图尺寸（如 512px）布局，
+        // 把窗口撑到巨大瞬时尺寸 → 按锚点定位时顶部被推到屏幕外、再被系统钳到顶边（重启后位置偏移的根因）。
+        CoverImage.Width = 0;
+        CoverImage.Height = 0;
+        // 初始阶段定位前先移出屏幕，避免默认位置 + 瞬时巨大尺寸的闪烁
+        Position = new PixelPoint(-20000, -20000);
 
         _topmostTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
         _topmostTimer.Tick += (_, _) => Win32.AssertTopmost(_hwnd);
@@ -813,10 +821,17 @@ public sealed partial class LyricsOverlayWindow : Window
 
     private void OnSizeChanged(object? sender, SizeChangedEventArgs e)
     {
+        Log.Info($"trc OnSizeChanged client={e.NewSize.Width:F1}x{e.NewSize.Height:F1} old={e.PreviousSize.Width:F1}x{e.PreviousSize.Height:F1} wc={e.WidthChanged} hc={e.HeightChanged} pos={Position.X},{Position.Y} first={_firstSizeApplied} grow={_settingsService.Current.HeightGrowMode}");
         if (!_suppressPositionUpdate && ClientSize.Width > 0 && ClientSize.Height > 0)
         {
             var grow = _settingsService.Current.HeightGrowMode;
-            if (_firstSizeApplied && e.HeightChanged && !e.WidthChanged && grow != 0)
+            if (!_firstSizeApplied)
+            {
+                // 初始阶段：尺寸剧烈变化（封面/布局瞬时巨大尺寸），不立即定位
+                // （会把顶部推到屏幕外再被钳到顶边），待尺寸稳定合理后再以锚点定位一次。
+                ScheduleInitialAnchorApply();
+            }
+            else if (e.HeightChanged && !e.WidthChanged && grow != 0)
             {
                 // 纯高度变化（胶囊展开/封面动画/字体变化）：
                 // 1=向下扩展（顶部固定，Position 不变）；2=向上扩展（底部固定，顶部上移）
@@ -831,13 +846,15 @@ public sealed partial class LyricsOverlayWindow : Window
             else
             {
                 RepositionToAnchor();
-                if (e.WidthChanged || !_firstSizeApplied)
-                    _firstSizeApplied = true;
             }
         }
         // 记录当前窗口底边（物理像素），供"向上扩展"模式使用
         var scale = Screens.ScreenFromWindow(this)?.Scaling ?? 1.0;
         _lastGrowBottom = Position.Y + (int)Math.Round(ClientSize.Height * scale);
+        // 锚点 = 窗口实际中心：初始定位完成后的尺寸/位置变化同步（含纯高度增长的上下扩展），
+        // 否则锚点停留在上次拖拽时的旧中心，后续宽度变化重定位会把窗口向上/下漂移。
+        if (_firstSizeApplied)
+            WriteAnchorFromPosition();
         LogSizeDiagnostics();
     }
 
@@ -930,7 +947,33 @@ public sealed partial class LyricsOverlayWindow : Window
             _anchor = new PixelPoint(area.X + area.Width / 2, (int)(area.Y + area.Height * 0.85));
         }
         ClampAnchorToScreens();
+        // 不立即定位：初始布局阶段尺寸巨大/振荡，立即定位会把窗口推到屏幕外。
+        // 待尺寸稳定且合理后再以锚点定位一次。
+        ScheduleInitialAnchorApply();
+    }
+
+    /// <summary>初始阶段尺寸"合理"的高度上限（正常内容高度远小于此；>此说明处于瞬时巨大尺寸）。</summary>
+    private static readonly double InitialHeightThreshold = 300;
+
+    /// <summary>
+    /// 延迟到初始尺寸稳定（连续若干毫秒不再变化）后再以锚点定位。
+    /// 尺寸仍处于瞬时巨大值时先不安排（等下一次变化再判断），避免用巨大尺寸定位。
+    /// </summary>
+    private void ScheduleInitialAnchorApply()
+    {
+        if (ClientSize.Height > InitialHeightThreshold || ClientSize.Width > 2000)
+            return;
+        _initialAnchorDebouncer.Schedule(TimeSpan.FromMilliseconds(200), ApplyInitialAnchor);
+    }
+
+    /// <summary>初始定位：以当前（稳定后的）尺寸按锚点居中放置窗口，并同步锚点。</summary>
+    private void ApplyInitialAnchor()
+    {
+        if (_firstSizeApplied)
+            return;
+        _firstSizeApplied = true;
         RepositionToAnchor();
+        WriteAnchorFromPosition();
     }
 
     private void RepositionToAnchor()
@@ -942,16 +985,31 @@ public sealed partial class LyricsOverlayWindow : Window
         _suppressPositionUpdate = true;
         Position = new PixelPoint((int)(_anchor.X - pw / 2), (int)(_anchor.Y - ph / 2));
         _suppressPositionUpdate = false;
+        Log.Info($"trc RepositionToAnchor anchor=({_anchor.X},{_anchor.Y}) client={ClientSize.Width:F1}x{ClientSize.Height:F1} s={s:F3} pos={Position.X},{Position.Y}");
     }
 
     private void WriteAnchorFromPosition()
     {
+        if (ClientSize.Width <= 0 || ClientSize.Height <= 0)
+            return;
         var s = Screens.ScreenFromWindow(this)?.Scaling ?? 1.0;
         _anchor = new PixelPoint(
             (int)(Position.X + ClientSize.Width * s / 2),
             (int)(Position.Y + ClientSize.Height * s / 2));
         var ax = _anchor.X; var ay = _anchor.Y;
         _anchorDebouncer.Schedule(TimeSpan.FromMilliseconds(500), () => AnchorChanged?.Invoke(ax, ay));
+    }
+
+    /// <summary>退出前立即持久化当前锚点（绕过防抖），保证下次启动位置与退出时一致。</summary>
+    public void PersistAnchor()
+    {
+        if (ClientSize.Width <= 0 || ClientSize.Height <= 0)
+            return;
+        var s = Screens.ScreenFromWindow(this)?.Scaling ?? 1.0;
+        _anchor = new PixelPoint(
+            (int)(Position.X + ClientSize.Width * s / 2),
+            (int)(Position.Y + ClientSize.Height * s / 2));
+        AnchorChanged?.Invoke(_anchor.X, _anchor.Y);
     }
 
     private void ClampAnchorToScreens()
