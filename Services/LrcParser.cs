@@ -8,6 +8,12 @@ namespace EasyDesktopLyrics.Services;
 /// </summary>
 public static partial class LrcParser
 {
+    /// <summary>
+    /// 瞬时空行过滤阈值（ms）：空文本行距下一句非空歌词不足此值时视为源文件伪影并丢弃，
+    /// 否则播放定位会短暂选中空行而闪现省略号。仅当空行占据足够久的时间（真实间奏）才保留。
+    /// </summary>
+    private const long TransientEmptyLineMs = 2000;
+
     [GeneratedRegex(@"\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]")]
     private static partial Regex TimeTag();
 
@@ -165,7 +171,30 @@ public static partial class LrcParser
         if (main.Count == 0)
             return null;
 
-        var lines = main.Select(m => new LyricLine(m.TimeMs, m.Text, null)).ToList();
+        // 过滤"瞬时空行"：空文本行仅在距下一句非空歌词足够久（真实间奏）时才保留；
+        // 紧贴下一句的空行（部分网易云 LRC 的占位伪影）会让 FindIndex 选中空行 → 闪现省略号。
+        var filtered = new List<(long TimeMs, string Text)>(main.Count);
+        for (var i = 0; i < main.Count; i++)
+        {
+            var (timeMs, text) = main[i];
+            if (text.Length == 0)
+            {
+                var nextNonEmpty = -1L;
+                for (var j = i + 1; j < main.Count; j++)
+                {
+                    if (main[j].Text.Length > 0)
+                    {
+                        nextNonEmpty = main[j].TimeMs;
+                        break;
+                    }
+                }
+                if (nextNonEmpty >= 0 && nextNonEmpty - timeMs < TransientEmptyLineMs)
+                    continue;
+            }
+            filtered.Add((timeMs, text));
+        }
+
+        var lines = filtered.Select(m => new LyricLine(m.TimeMs, m.Text, null)).ToList();
 
         if (!string.IsNullOrWhiteSpace(transLrc))
         {
