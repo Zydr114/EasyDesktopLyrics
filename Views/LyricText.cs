@@ -227,9 +227,13 @@ public sealed class LyricText : Control
 
         var thickness = StrokeEnabled ? StrokeThickness : 0;
 
-        // 平涂路径（无逐字数据 / 单色层）：整行单色
+        // 平涂路径（无逐字数据 / 单色层）：整行单色。
+        // 无逐字数据时没有"未唱段"概念 → 未唱侧层（Right：未唱层/未唱辉光）整体不绘制，
+        // 否则未唱色/未唱辉光会作用到整行（非逐字歌词也被未唱辉光照亮）。
         if (IsFlatMode || HighlightClip == ClipSideMode.None)
         {
+            if (IsFlatMode && HighlightClip == ClipSideMode.Right)
+                return;
             DrawBody(context, body, thickness);
             return;
         }
