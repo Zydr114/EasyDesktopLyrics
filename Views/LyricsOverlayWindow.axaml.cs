@@ -30,6 +30,7 @@ public sealed partial class LyricsOverlayWindow : Window
     private readonly DispatcherTimer _hideControlsTimer;
     private readonly DispatcherTimer _coverStageTimer;
     private readonly DispatcherTimer _coverTimeoutTimer;
+    private readonly DispatcherTimer _lineAnimTimer;
     private readonly UiDebouncer _anchorDebouncer = new();
     private readonly UiDebouncer _initialAnchorDebouncer = new();
 
@@ -58,6 +59,19 @@ public sealed partial class LyricsOverlayWindow : Window
     private TextBlock _transTb = null!;
     private readonly List<TextBlock> _strokeLayers = [];
     private readonly List<Control> _glowLayers = [];
+
+    // 行间切换动效状态
+    private string _lineAnimKind = "";
+    private DateTimeOffset _lineAnimStart;
+    private int _lineAnimToken;
+    private bool _revealHidingInactive;
+    private LyricText? _mainGlowLyric;
+    private LyricText? _inactiveGlowLyric;
+    private LyricText? _shineLayer;
+    private string _lastMainText = "";
+    private string _lastTransText = "";
+    private Control? _exitMainOverlay;
+    private Control? _exitTransOverlay;
 
     public event Action<double, double>? AnchorChanged;
 
@@ -106,6 +120,9 @@ public sealed partial class LyricsOverlayWindow : Window
         _coverStageTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
         _coverStageTimer.Tick += (_, _) => OnCoverStage();
 
+        _lineAnimTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(16) };
+        _lineAnimTimer.Tick += (_, _) => OnLineAnimTick();
+
         _coverTimeoutTimer = new DispatcherTimer { Interval = CoverAnimTimeout };
         _coverTimeoutTimer.Tick += (_, _) => OnCoverStage();
 
@@ -135,6 +152,9 @@ public sealed partial class LyricsOverlayWindow : Window
                 _coverPosDirty = false;
                 UpdateCoverTitlePosition();
             }
+            // 扫光层跟随主行位置（行宽/布局变化后保持对齐）
+            if (_lineAnimKind == "Shine" && _shineLayer != null)
+                PositionShineLayer();
         };
 
         _lastCoverEnabled = _vm.CoverEnabled;
@@ -144,11 +164,13 @@ public sealed partial class LyricsOverlayWindow : Window
 
         ApplyCoverAnimationStyle();
         _settingsService.Changed += ApplyCoverAnimationStyle;
+        _settingsService.Changed += OnLineTransitionSettingsChanged;
 
         _mainGrid.SizeChanged += (_, _) => UpdateCoverSize();
         // 歌词行宽度变化（不同行文本长度）时封面位置跟随（靠右布局依赖歌词宽度）
         RootPanel.SizeChanged += (_, _) => UpdateCoverPosition();
         _vm.PropertyChanged += OnVmChanged;
+        _vm.LineChanged += OnLineChanged;
         SizeChanged += OnSizeChanged;
     }
 
@@ -325,6 +347,8 @@ public sealed partial class LyricsOverlayWindow : Window
     /// 主行辉光按逐字分段（未唱段透明，光晕只照亮已唱段）；未唱辉光为独立可选项。</summary>
     private void ApplyGlow()
     {
+        _mainGlowLyric = null;
+        _inactiveGlowLyric = null;
         foreach (var s in _glowLayers)
         {
             _mainGrid.Children.Remove(s);
@@ -343,6 +367,7 @@ public sealed partial class LyricsOverlayWindow : Window
             ig.HighlightClip = LyricText.ClipSideMode.Right;
             _mainGrid.Children.Insert(0, ig);
             _glowLayers.Add(ig);
+            _inactiveGlowLyric = ig;
         }
 
         if (_vm.GlowEnabled)
@@ -355,6 +380,7 @@ public sealed partial class LyricsOverlayWindow : Window
             gm.HighlightClip = LyricText.ClipSideMode.Left;
             _mainGrid.Children.Insert(0, gm);
             _glowLayers.Add(gm);
+            _mainGlowLyric = gm;
 
             var gt = CreateGlowLayer("TransText", "EffectiveTransFontSize");
             gt.Bind(TextBlock.IsVisibleProperty, new Avalonia.Data.Binding("ShowTransLine"));
@@ -453,6 +479,598 @@ public sealed partial class LyricsOverlayWindow : Window
                     ExitCoverTitle();
             }
         }
+    }
+
+    // ---------- 行间切换动效 ----------
+
+    /// <summary>上一次行间动效的结束时刻；行变化过密时回退为瞬切，避免反复从 0 淡入导致持续偏暗。</summary>
+    private DateTimeOffset _lineTransitionUntil;
+
+    /// <summary>
+    /// 行切换回调（由 Orchestrator 触发，UI 线程）：开关关闭/抑制（切歌、seek、手动校正）/封面动画期间直接忽略，
+    /// 保持当前版本的即时切换；否则按类型播放进入动效。任何异常回退到即时切换（Opacity=1、无变换）。
+    /// </summary>
+    private void OnLineChanged(bool suppress)
+    {
+        if (!_settingsService.Current.LineTransitionEnabled)
+            return;
+        if (suppress || _coverAnimating || !IsVisible)
+        {
+            SyncLastLineText();
+            return;
+        }
+
+        var durMs = Math.Clamp(_settingsService.Current.LineTransitionDurationMs, 50, 1500);
+        if (DateTimeOffset.UtcNow < _lineTransitionUntil)
+        {
+            // 行变化过密：直接瞬切
+            CancelLineAnimation();
+            ResetLineTransitionState();
+            SyncLastLineText();
+            return;
+        }
+        _lineTransitionUntil = DateTimeOffset.UtcNow.AddMilliseconds(durMs);
+
+        try
+        {
+            // 交叉淡化自带旧行退场；其余动效统一叠加旧行淡出覆盖层，避免旧行瞬灭
+            if (_settingsService.Current.LineTransitionType != "Crossfade")
+                PlayExitOverlay(durMs);
+            switch (_settingsService.Current.LineTransitionType)
+            {
+                case "Crossfade": PlayCrossfade(durMs); break;
+                case "Reveal": PlayReveal(durMs); break;
+                case "Shine": PlayShine(durMs); break;
+                default: PlayLineTransition(); break; // Fade / Slide / Scale
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error("line transition", ex);
+            CancelLineAnimation();
+            ResetLineTransitionState();
+        }
+        SyncLastLineText();
+    }
+
+    /// <summary>记录当前行文本，供交叉淡化的旧行快照使用。</summary>
+    private void SyncLastLineText()
+    {
+        _lastMainText = _vm.MainText;
+        _lastTransText = _vm.TransText;
+    }
+
+    /// <summary>
+    /// 旧行退场：把上一行文本作为覆盖层叠加在 LyricsArea 上，按动效类型播放退场动画，
+    /// 与新行的进入动效同时进行，避免旧行瞬灭。覆盖层不放在主行网格内，因此不受
+    /// 进入动效对网格透明度的影响。
+    /// </summary>
+    private void PlayExitOverlay(int durMs)
+    {
+        var s = _settingsService.Current;
+        var type = s.LineTransitionType;
+        var durMsClamped = Math.Clamp(durMs, 50, 1500);
+        var fadeDur = TimeSpan.FromMilliseconds(Math.Min(200, durMsClamped));
+        var moveDur = TimeSpan.FromMilliseconds(Math.Min(250, durMsClamped));
+
+        if (_lastMainText.Length > 0)
+        {
+            var old = CreateExitLyric(_lastMainText);
+            old.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            old.HorizontalAlignment = HorizontalAlignment.Left; // 取文字宽度，由 RenderTransform 定位
+            LyricsArea.Children.Add(old);
+            _exitMainOverlay = old;
+            AnimateExitOverlay(old, _mainGrid, type, s, fadeDur, moveDur);
+        }
+        if (s.ShowTranslation && _lastTransText.Length > 0)
+        {
+            var oldT = CreateExitTranslation(_lastTransText);
+            oldT.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            oldT.HorizontalAlignment = HorizontalAlignment.Left;
+            LyricsArea.Children.Add(oldT);
+            _exitTransOverlay = oldT;
+            AnimateExitOverlay(oldT, _transGrid, type, s, fadeDur, moveDur);
+        }
+    }
+
+    /// <summary>
+    /// 退场覆盖层动画：淡出类只做透明度；缩放弹入可放大淡出（设置开关）；位移淡入沿
+    /// 与入场相反的一侧退出。覆盖层居中原位（水平 = 歌词区中心 - 文字宽度/2，垂直跟随锚点行）。
+    /// </summary>
+    private void AnimateExitOverlay(Control c, Control verticalAnchor, string type, AppSettings s, TimeSpan fadeDur, TimeSpan moveDur)
+    {
+        var basePoint = ExitBasePoint(c, verticalAnchor);
+        c.RenderTransform = Translate(basePoint.X, basePoint.Y);
+        c.RenderTransformOrigin = new RelativePoint(0.5, 0.5, RelativeUnit.Relative);
+
+        var dur = fadeDur;
+        TransformOperations? start = null, end = null;
+        if (type == "Scale" && s.LineTransitionScaleExitGrow)
+        {
+            dur = moveDur;
+            start = ExitTransform(basePoint, 1.0);
+            end = ExitTransform(basePoint, 1.15);
+        }
+        else if (type == "Slide")
+        {
+            dur = moveDur;
+            var (dx, dy) = LineSlideOffset(s.LineTransitionDirection, s.LineTransitionDistance);
+            start = Translate(basePoint.X, basePoint.Y);
+            end = Translate(basePoint.X - dx, basePoint.Y - dy);
+        }
+
+        var transitions = new Transitions
+        {
+            new DoubleTransition { Property = Visual.OpacityProperty, Duration = dur },
+        };
+        if (start != null && end != null)
+            transitions.Add(new TransformOperationsTransition
+            {
+                Property = Visual.RenderTransformProperty,
+                Duration = dur,
+                Easing = EasingFor(s.LineTransitionEasing),
+            });
+
+        c.Transitions = null;
+        c.Opacity = 1;
+        if (start != null)
+            c.RenderTransform = start;
+        c.Transitions = transitions;
+        c.Opacity = 0;
+        if (end != null)
+            c.RenderTransform = end;
+
+        RemoveExitAfter(c, dur);
+    }
+
+    /// <summary>退场覆盖层居中原位（水平 = 歌词区中心 - 文字宽度/2，垂直跟随锚点行）。</summary>
+    private Point ExitBasePoint(Control c, Control verticalAnchor)
+    {
+        var p = verticalAnchor.TranslatePoint(new Point(0, 0), LyricsArea) ?? new Point(0, 0);
+        var cx = LyricsArea.Bounds.Width / 2;
+        var w = c.DesiredSize.Width > 0 ? c.DesiredSize.Width : c.Bounds.Width;
+        return new Point(cx - w / 2, p.Y);
+    }
+
+    /// <summary>位移 + 缩放的组合变换（先缩放后平移，配合中心轴 RenderTransformOrigin）。</summary>
+    private static TransformOperations ExitTransform(Point t, double scale)
+    {
+        var b = new TransformOperations.Builder(2);
+        b.AppendTranslate(t.X, t.Y);
+        b.AppendScale(scale, scale);
+        return b.Build();
+    }
+
+    /// <summary>退场动画结束后移除覆盖层并清理引用。</summary>
+    private void RemoveExitAfter(Control c, TimeSpan dur)
+    {
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(dur + TimeSpan.FromMilliseconds(60));
+            Dispatcher.UIThread.Post(() =>
+            {
+                LyricsArea.Children.Remove(c);
+                if (ReferenceEquals(_exitMainOverlay, c))
+                    _exitMainOverlay = null;
+                if (ReferenceEquals(_exitTransOverlay, c))
+                    _exitTransOverlay = null;
+            });
+        });
+    }
+
+    /// <summary>立即移除未完成的退场覆盖层（动效中断/开关关闭时清理残留）。</summary>
+    private void ClearExitOverlays()
+    {
+        if (_exitMainOverlay != null)
+        {
+            LyricsArea.Children.Remove(_exitMainOverlay);
+            _exitMainOverlay = null;
+        }
+        if (_exitTransOverlay != null)
+        {
+            LyricsArea.Children.Remove(_exitTransOverlay);
+            _exitTransOverlay = null;
+        }
+    }
+
+    /// <summary>淡入/位移淡入/缩放弹入：主行与翻译行整体从起始状态过渡到最终状态。</summary>
+    private void PlayLineTransition()
+    {
+        var s = _settingsService.Current;
+        var durMs = Math.Clamp(s.LineTransitionDurationMs, 50, 1500);
+        var dur = TimeSpan.FromMilliseconds(durMs);
+        var easing = EasingFor(s.LineTransitionEasing);
+
+        var (dx, dy) = LineSlideOffset(s.LineTransitionDirection, s.LineTransitionDistance);
+        var start = s.LineTransitionType switch
+        {
+            "Slide" => Translate(dx, dy),
+            "Scale" => Scale(s.LineTransitionScale, s.LineTransitionScale),
+            _ => TransformOperations.Identity,
+        };
+
+        AnimateLineHost(_mainGrid, start, dur, easing);
+        AnimateLineHost(_transGrid, start, dur, easing);
+
+        // 位移淡入入场模糊：进入过程中文字由模糊逐渐清晰
+        if (s.LineTransitionType == "Slide" && s.LineTransitionSlideBlurEnabled)
+            StartSlideBlur(durMs);
+    }
+
+    /// <summary>位移淡入入场模糊：给主行/翻译行网格挂 BlurEffect，由 _lineAnimTimer 驱动半径衰减到 0。</summary>
+    private void StartSlideBlur(int durMs)
+    {
+        var radius = Math.Clamp(_settingsService.Current.LineTransitionSlideBlurRadius, 0, 20);
+        if (radius <= 0)
+            return;
+        _mainGrid.Effect = new BlurEffect { Radius = radius };
+        _transGrid.Effect = new BlurEffect { Radius = radius };
+
+        _lineAnimTimer.Stop();
+        _lineAnimKind = "SlideBlur";
+        _lineAnimStart = DateTimeOffset.UtcNow;
+        _lineAnimToken++;
+        _lineAnimTimer.Start();
+    }
+
+    /// <summary>取消入场模糊：移除网格上的模糊效果。</summary>
+    private void ClearSlideBlur()
+    {
+        _mainGrid.Effect = null;
+        _transGrid.Effect = null;
+    }
+
+    /// <summary>
+    /// 交叉淡化：新行已就位（整行保持可见），旧行快照叠加在最上层淡出，自然露出新行。
+    /// 避免动画整行网格透明度——否则旧行快照作为子元素会随之变暗，视觉上"藏在"新行后面。
+    /// </summary>
+    private void PlayCrossfade(int durMs)
+    {
+        var s = _settingsService.Current;
+        var dur = TimeSpan.FromMilliseconds(durMs);
+        var easing = EasingFor(s.LineTransitionEasing);
+
+        _mainGrid.Opacity = 1;
+        _transGrid.Opacity = 1;
+
+        if (_lastMainText.Length > 0)
+        {
+            var old = CreateExitLyric(_lastMainText);
+            _mainGrid.Children.Add(old);
+            FadeOutAndRemove(_mainGrid, old, dur);
+        }
+        if (s.ShowTranslation && _lastTransText.Length > 0)
+        {
+            var oldT = CreateExitTranslation(_lastTransText);
+            _transGrid.Children.Add(oldT);
+            FadeOutAndRemove(_transGrid, oldT, dur);
+        }
+    }
+
+    /// <summary>当前歌词对齐方式（按设置解析）。</summary>
+    private TextAlignment LineAlignmentValue =>
+        (TextAlignment)Enum.Parse(typeof(TextAlignment), _settingsService.Current.Alignment);
+
+    /// <summary>
+    /// 当前歌词水平定位方式（按设置解析）。LyricText 把文字绘制在自身 (0,0)，必须让行控件
+    /// 保持文字宽度并居中定位，否则网格被旧行快照撑宽时行控件被 Stretch 拉宽、文字滞留左端。
+    /// </summary>
+    private HorizontalAlignment LineHorizontalAlignment => _settingsService.Current.Alignment switch
+    {
+        "Left" => HorizontalAlignment.Left,
+        "Right" => HorizontalAlignment.Right,
+        _ => HorizontalAlignment.Center,
+    };
+
+    /// <summary>旧行快照（整行主色，无逐字遮罩），样式复制自当前已唱层，并按当前对齐设定渲染。</summary>
+    private LyricText CreateExitLyric(string text)
+    {
+        return new LyricText
+        {
+            Text = text,
+            FontFamily = _mainLyric.FontFamily,
+            FontWeight = _mainLyric.FontWeight,
+            FontSize = _mainLyric.FontSize,
+            TextAlignment = LineAlignmentValue,
+            HorizontalAlignment = LineHorizontalAlignment,
+            Fill = _mainLyric.Fill,
+            StrokeEnabled = _mainLyric.StrokeEnabled,
+            StrokeBrush = _mainLyric.StrokeBrush,
+            StrokeThickness = _mainLyric.StrokeThickness,
+            Effect = _mainLyric.Effect,
+            HighlightLength = -1,
+            HighlightClip = LyricText.ClipSideMode.None,
+            Opacity = 1,
+        };
+    }
+
+    /// <summary>旧翻译行快照，样式复制自当前翻译行，并按当前对齐设定渲染。</summary>
+    private TextBlock CreateExitTranslation(string text)
+    {
+        return new TextBlock
+        {
+            Text = text,
+            FontFamily = _transTb.FontFamily,
+            FontSize = _transTb.FontSize,
+            TextAlignment = LineAlignmentValue,
+            Foreground = _transTb.Foreground,
+            Effect = _transTb.Effect,
+            Opacity = 1,
+        };
+    }
+
+    /// <summary>淡出后从父网格移除（任务延迟 → UI 线程移除）；afterRemoved 用于清理引用。</summary>
+    private static void FadeOutAndRemove(Grid parent, Control c, TimeSpan dur, Action? afterRemoved = null)
+    {
+        c.Transitions = new Transitions
+        {
+            new DoubleTransition { Property = Visual.OpacityProperty, Duration = dur },
+        };
+        c.Opacity = 0;
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(dur + TimeSpan.FromMilliseconds(60));
+            Dispatcher.UIThread.Post(() =>
+            {
+                parent.Children.Remove(c);
+                afterRemoved?.Invoke();
+            });
+        });
+    }
+
+    /// <summary>
+    /// 逐字显现：隐藏未唱层/未唱辉光，仅已唱层由 EnterProgress 驱动从左到右逐字符点亮；
+    /// 翻译行以淡入同步进入。结束后恢复未唱层，交还卡拉 OK 逐字进度。
+    /// </summary>
+    private void PlayReveal(int durMs)
+    {
+        _lineAnimTimer.Stop();
+        _lineAnimKind = "Reveal";
+        _lineAnimStart = DateTimeOffset.UtcNow;
+        _lineAnimToken++;
+
+        _revealHidingInactive = true;
+        _inactiveLyric.IsVisible = false;
+        if (_inactiveGlowLyric != null)
+            _inactiveGlowLyric.IsVisible = false;
+
+        ApplyEnterProgress(0);
+        AnimateLineHost(_transGrid, TransformOperations.Identity,
+            TimeSpan.FromMilliseconds(durMs), EasingFor(_settingsService.Current.LineTransitionEasing));
+        _lineAnimTimer.Start();
+    }
+
+    /// <summary>
+    /// 扫光：主行整体压暗，白色亮带叠加在主行上方从左到右扫描（白底白字时仍清晰可见）。
+    /// 亮带层放在 LyricsArea（视图盒的同级覆盖层）上，不受主行网格透明度影响。
+    /// </summary>
+    private void PlayShine(int durMs)
+    {
+        EnsureShineLayer();
+
+        _lineAnimTimer.Stop();
+        _lineAnimKind = "Shine";
+        _lineAnimStart = DateTimeOffset.UtcNow;
+        _lineAnimToken++;
+
+        _mainGrid.Transitions = null;
+        _mainGrid.Opacity = 0.35;
+        ApplyShineProgress(0);
+        PositionShineLayer();
+        AnimateLineHost(_transGrid, TransformOperations.Identity,
+            TimeSpan.FromMilliseconds(durMs), EasingFor(_settingsService.Current.LineTransitionEasing));
+        _lineAnimTimer.Start();
+    }
+
+    private void EnsureShineLayer()
+    {
+        if (_shineLayer != null)
+            return;
+        var sl = new LyricText();
+        sl.Bind(LyricText.TextProperty, new Avalonia.Data.Binding("MainText"));
+        sl.Bind(LyricText.FontFamilyProperty, new Avalonia.Data.Binding("FontFamilyValue"));
+        sl.Bind(LyricText.FontWeightProperty, new Avalonia.Data.Binding("WeightValue"));
+        sl.Bind(LyricText.FontSizeProperty, new Avalonia.Data.Binding("MainFontSize"));
+        sl.Bind(LyricText.TextAlignmentProperty, new Avalonia.Data.Binding("TextAlignment"));
+        sl.Fill = Brushes.White;
+        sl.Opacity = 1;
+        sl.ShineProgress = -1;
+        LyricsArea.Children.Add(sl);
+        _shineLayer = sl;
+    }
+
+    /// <summary>把扫光层定位到主行（MainGrid）在 LyricsArea 坐标系中的位置。</summary>
+    private void PositionShineLayer()
+    {
+        if (_shineLayer == null)
+            return;
+        var p = _mainGrid.TranslatePoint(new Point(0, 0), LyricsArea) ?? new Point(0, 0);
+        _shineLayer.RenderTransform = Translate(p.X, p.Y);
+    }
+
+    private void ApplyEnterProgress(double p)
+    {
+        _mainLyric.EnterProgress = p;
+        if (_mainGlowLyric != null)
+            _mainGlowLyric.EnterProgress = p;
+    }
+
+    private void ApplyShineProgress(double p)
+    {
+        if (_shineLayer != null)
+            _shineLayer.ShineProgress = p;
+    }
+
+    private void OnLineAnimTick()
+    {
+        var token = _lineAnimToken;
+        var durMs = Math.Clamp(_settingsService.Current.LineTransitionDurationMs, 50, 1500);
+        var p = Math.Clamp((DateTimeOffset.UtcNow - _lineAnimStart).TotalMilliseconds / durMs, 0, 1);
+
+        switch (_lineAnimKind)
+        {
+            case "Reveal": ApplyEnterProgress(p); break;
+            case "Shine": ApplyShineProgress(p); break;
+            case "SlideBlur":
+            {
+                var r = Math.Clamp(_settingsService.Current.LineTransitionSlideBlurRadius, 0, 20);
+                var blur = r * (1 - p);
+                if (_mainGrid.Effect is BlurEffect mb) mb.Radius = blur;
+                if (_transGrid.Effect is BlurEffect tb) tb.Radius = blur;
+                break;
+            }
+        }
+
+        if (p >= 1)
+        {
+            _lineAnimTimer.Stop();
+            if (token != _lineAnimToken)
+                return;
+            FinishLineAnimation();
+        }
+    }
+
+    private void FinishLineAnimation()
+    {
+        if (_lineAnimKind == "Shine")
+        {
+            PlayShineOutro();
+        }
+        else if (_lineAnimKind == "Reveal")
+        {
+            _mainLyric.EnterProgress = -1;
+            if (_mainGlowLyric != null)
+                _mainGlowLyric.EnterProgress = -1;
+            if (_revealHidingInactive)
+            {
+                _inactiveLyric.IsVisible = true;
+                if (_inactiveGlowLyric != null)
+                    _inactiveGlowLyric.IsVisible = true;
+                _revealHidingInactive = false;
+            }
+        }
+        else if (_lineAnimKind == "SlideBlur")
+        {
+            ClearSlideBlur();
+        }
+        _lineAnimKind = "";
+    }
+
+    /// <summary>
+    /// 扫光退出：主行从压暗平滑恢复到正常亮度，亮带同步淡出后移除，避免"扫完直接跳回"的突兀感。
+    /// </summary>
+    private void PlayShineOutro()
+    {
+        var durMs = Math.Clamp(_settingsService.Current.LineTransitionDurationMs, 50, 1500);
+        var outro = TimeSpan.FromMilliseconds(Math.Min(200, durMs));
+
+        _mainGrid.Transitions = new Transitions
+        {
+            new DoubleTransition { Property = Visual.OpacityProperty, Duration = outro, Easing = new QuadraticEaseOut() },
+        };
+        _mainGrid.Opacity = 1;
+
+        var sl = _shineLayer;
+        if (sl != null)
+        {
+            _shineLayer = null;
+            sl.Transitions = new Transitions
+            {
+                new DoubleTransition { Property = Visual.OpacityProperty, Duration = outro },
+            };
+            sl.Opacity = 0;
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(outro + TimeSpan.FromMilliseconds(60));
+                Dispatcher.UIThread.Post(() => LyricsArea.Children.Remove(sl));
+            });
+        }
+    }
+
+    /// <summary>中断行间动效（新行到来/开关关闭/异常回退）：停表、清理逐字/扫光临时层并恢复隐藏层。</summary>
+    private void CancelLineAnimation()
+    {
+        _lineAnimToken++;
+        _lineAnimTimer.Stop();
+        _lineAnimKind = "";
+
+        _mainLyric.EnterProgress = -1;
+        if (_mainGlowLyric != null)
+            _mainGlowLyric.EnterProgress = -1;
+        if (_shineLayer != null)
+        {
+            LyricsArea.Children.Remove(_shineLayer);
+            _shineLayer = null;
+        }
+        _mainGrid.Opacity = 1;
+        ClearSlideBlur();
+        if (_revealHidingInactive)
+        {
+            _inactiveLyric.IsVisible = true;
+            if (_inactiveGlowLyric != null)
+                _inactiveGlowLyric.IsVisible = true;
+            _revealHidingInactive = false;
+        }
+        ClearExitOverlays();
+    }
+
+    /// <summary>
+    /// 行载体进入动画：先禁用过渡瞬移起始状态，再挂过渡并将属性设为目标值 → 播放过渡。
+    /// （与封面动画同套路；RenderTransform 不参与布局，不干扰 SizeToContent。）
+    /// </summary>
+    private static void AnimateLineHost(Control host, TransformOperations start, TimeSpan dur, Easing easing)
+    {
+        var transitions = new Transitions
+        {
+            new DoubleTransition { Property = Visual.OpacityProperty, Duration = dur, Easing = easing },
+            new TransformOperationsTransition { Property = Visual.RenderTransformProperty, Duration = dur, Easing = easing },
+        };
+        host.Transitions = null;
+        host.Opacity = 0;
+        host.RenderTransform = start;
+        host.Transitions = transitions;
+        host.Opacity = 1;
+        host.RenderTransform = TransformOperations.Identity;
+    }
+
+    /// <summary>行间滑入方向偏移：1=上，2=下，3=左，4=右，0=无位移；位移强度可配置。</summary>
+    private static (double dx, double dy) LineSlideOffset(int dir, double dist)
+    {
+        var d = Math.Clamp(dist, 0, 60);
+        return dir switch
+        {
+            1 => (0, -d), // 起点在上方（向下滑入）
+            2 => (0, d),  // 起点在下方（向上滑入）
+            3 => (-d, 0), // 起点在左侧（向右滑入）
+            4 => (d, 0),  // 起点在右侧（向左滑入）
+            _ => (0, 0),
+        };
+    }
+
+    private static TransformOperations Scale(double sx, double sy)
+    {
+        var b = new TransformOperations.Builder(1);
+        b.AppendScale(sx, sy);
+        return b.Build();
+    }
+
+    /// <summary>回退到即时切换的安全状态：取消动效、恢复完全可见与无变换。</summary>
+    private void ResetLineTransitionState()
+    {
+        CancelLineAnimation();
+        _mainGrid.Transitions = null;
+        _transGrid.Transitions = null;
+        _mainGrid.Opacity = 1;
+        _transGrid.Opacity = 1;
+        _mainGrid.RenderTransform = TransformOperations.Identity;
+        _transGrid.RenderTransform = TransformOperations.Identity;
+    }
+
+    /// <summary>设置变化：关闭行间动效时清理可能残留的动画状态。</summary>
+    private void OnLineTransitionSettingsChanged()
+    {
+        if (!_settingsService.Current.LineTransitionEnabled)
+            ResetLineTransitionState();
     }
 
     // ---------- 封面 ----------
@@ -769,13 +1387,16 @@ public sealed partial class LyricsOverlayWindow : Window
     private void ApplyAlignment()
     {
         var alig = _vm.TextAlignment;
+        var hAlign = LineHorizontalAlignment;
         _mainLyric.TextAlignment = alig;
+        _mainLyric.HorizontalAlignment = hAlign;
+        _inactiveLyric.HorizontalAlignment = hAlign;
         _transTb.TextAlignment = alig;
         foreach (var s in _strokeLayers) s.TextAlignment = alig;
         foreach (var s in _glowLayers)
         {
             if (s is TextBlock tb) tb.TextAlignment = alig;
-            else if (s is LyricText lt) lt.TextAlignment = alig;
+            else if (s is LyricText lt) { lt.TextAlignment = alig; lt.HorizontalAlignment = hAlign; }
         }
     }
 
@@ -816,6 +1437,8 @@ public sealed partial class LyricsOverlayWindow : Window
         _coverStageTimer.Stop();
         _coverTimeoutTimer.Stop();
         _settingsService.Changed -= ApplyCoverAnimationStyle;
+        _settingsService.Changed -= OnLineTransitionSettingsChanged;
+        _vm.LineChanged -= OnLineChanged;
         base.OnClosed(e);
     }
 

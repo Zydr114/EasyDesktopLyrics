@@ -63,6 +63,28 @@ public sealed class AppSettings
     /// <summary>窗口锁定：完全不可动且鼠标穿透（WS_EX_TRANSPARENT），仅托盘/设置可解锁。</summary>
     public bool Locked { get; set; }
 
+    // ---- 行间切换动效 ----
+    /// <summary>行间切换动效总开关（默认关 = 保持当前版本的即时切换）。</summary>
+    public bool LineTransitionEnabled { get; set; }
+    /// <summary>动效类型："Fade" 淡入 / "Slide" 位移淡入 / "Scale" 缩放弹入 / "Crossfade" 交叉淡化 / "Reveal" 逐字显现 / "Shine" 扫光。</summary>
+    public string LineTransitionType { get; set; } = "Fade";
+    /// <summary>动效时长（ms；1.0 倍速参考基准 = 400ms）。</summary>
+    public int LineTransitionDurationMs { get; set; } = 400;
+    /// <summary>缩放弹入的起始缩放比例（仅"Scale"类型使用）。</summary>
+    public double LineTransitionScale { get; set; } = 0.85;
+    /// <summary>缩放弹入的旧行退场：true=放大淡出，false=直接淡出。</summary>
+    public bool LineTransitionScaleExitGrow { get; set; } = true;
+    /// <summary>位移淡入入场模糊开关（仅"Slide"类型使用）。</summary>
+    public bool LineTransitionSlideBlurEnabled { get; set; } = true;
+    /// <summary>位移淡入入场模糊半径（px）。</summary>
+    public double LineTransitionSlideBlurRadius { get; set; } = 4;
+    /// <summary>缓动曲线：Linear / Quadratic / Cubic / Sine / Exponential / Back。</summary>
+    public string LineTransitionEasing { get; set; } = "Quadratic";
+    /// <summary>滑入方向：0=无位移，1=上，2=下，3=左，4=右（与封面动画同语义）。</summary>
+    public int LineTransitionDirection { get; set; } = 2;
+    /// <summary>滑入位移强度（px）。</summary>
+    public double LineTransitionDistance { get; set; } = 10;
+
     // ---- 封面 ----
     /// <summary>播放时常驻显示封面。</summary>
     public bool CoverEnabled { get; set; }

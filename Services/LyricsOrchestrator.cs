@@ -46,6 +46,7 @@ public sealed partial class LyricsOrchestrator
     private bool _hasWords;
     private int _currentWordDone = -1;
     private double _currentWordFrac;
+    private bool _suppressLineTransition;
 
     public LyricsOrchestrator(
         SmtcService smtc,
@@ -94,6 +95,12 @@ public sealed partial class LyricsOrchestrator
     /// <summary>任何展示相关状态变化（相位/当前行/播放状态）。UI 线程回调。</summary>
     public event Action? StateChanged;
 
+    /// <summary>
+    /// 当前行切换（歌词行号变化）。UI 线程回调；bool = 是否抑制行间动效
+    /// （true：切歌/手动校正/seek 跳变等场景，应由宿主直接瞬切）。
+    /// </summary>
+    public event Action<bool>? LineChanged;
+
     /// <summary>手动校正后强制重新解析当前曲目（绕过磁盘缓存）。</summary>
     public void RefreshCurrent()
     {
@@ -103,6 +110,7 @@ public sealed partial class LyricsOrchestrator
         _cts?.Cancel();
         var cts = new CancellationTokenSource();
         _cts = cts;
+        _suppressLineTransition = true;
         Phase = LyricsPhase.Resolving;
         _doc = null;
         _hasWords = false;
@@ -130,6 +138,7 @@ public sealed partial class LyricsOrchestrator
     {
         _cts?.Cancel();
         _cts = null;
+        _suppressLineTransition = true;
         Track = t;
         _doc = null;
         _hasWords = false;
@@ -166,6 +175,8 @@ public sealed partial class LyricsOrchestrator
         // seek/时间轴跳变（>2s）时立即强制重定位当前行，不等下一次 timer tick
         var jump = _clock.Estimate() - posBefore;
         var seekJumped = jump > TimeSpan.FromSeconds(2) || jump < -TimeSpan.FromSeconds(2);
+        if (seekJumped)
+            _suppressLineTransition = true;
         Tick(forceRaise: seekJumped);
         Raise(); // IsPlaying 可能变化
     }
@@ -551,7 +562,7 @@ public sealed partial class LyricsOrchestrator
         }
     }
 
-    private void Tick(bool forceRaise)
+    private void Tick(bool forceRaise, bool suppressTransition = false)
     {
         if (_doc == null)
             return;
@@ -567,7 +578,11 @@ public sealed partial class LyricsOrchestrator
             ? CountDoneChars(_doc.Lines[idx], pos)
             : (-1, 0);
 
-        if (idx == _lineIndex && ended == _instrumentalEnded
+        var lineChanged = idx != _lineIndex;
+        var suppress = suppressTransition || _suppressLineTransition;
+        _suppressLineTransition = false;
+
+        if (!lineChanged && ended == _instrumentalEnded
             && done == _currentWordDone && Math.Abs(frac - _currentWordFrac) < 0.0005 && !forceRaise)
             return;
 
@@ -578,6 +593,9 @@ public sealed partial class LyricsOrchestrator
         CurrentMain = ResolveMainText(idx);
         CurrentTrans = idx >= 0 ? _doc.Lines[idx].Translation ?? "" : "";
         Raise();
+
+        if (lineChanged)
+            LineChanged?.Invoke(suppress);
     }
 
     /// <summary>
