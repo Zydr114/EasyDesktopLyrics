@@ -26,6 +26,18 @@ Windows 桌面歌词工具。通过 [SMTC](https://learn.microsoft.com/windows/u
 
 ![setting](screenshots/setting.png)
 
+## 动效演示
+
+歌词行切换动画（进入动效，可在设置中调整速度、缓动、方向等）：
+
+| 位移淡入 | 缩放弹入 |
+|:---:|:---:|
+| ![位移淡入演示](screenshots/位移淡入演示.gif) | ![缩放弹入演示](screenshots/缩放弹入演示.gif) |
+
+| 扫光 | 切歌动画 |
+|:---:|:---:|
+| ![扫光演示](screenshots/扫光演示.gif) | ![切歌动画演示](screenshots/切歌动画演示.gif) |
+
 ## 功能
 
 | 功能 | 说明 |
