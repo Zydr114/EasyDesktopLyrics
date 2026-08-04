@@ -203,14 +203,20 @@ public sealed class SpectrumFxSettings
 {
     public bool Enabled { get; set; }
 
-    /// <summary>位置："Bottom" 底部 / "Center" 行中央 / "Top" 顶部。</summary>
+    /// <summary>位置："Bottom" 底部（单侧，自下而上）/ "Center" 行中央（双侧，沿 x 轴对称）/ "Top" 顶部（单侧，自上而下）。</summary>
     public string Position { get; set; } = "Bottom";
 
     /// <summary>样式："Bars" 柱状图 / "Curve" 曲线 / "Line" 单曲线。</summary>
     public string Style { get; set; } = "Bars";
 
-    /// <summary>频谱高度（px）。</summary>
-    public double Height { get; set; } = 60;
+    /// <summary>强度：频谱最高峰高度 = 窗口高度百分比（10–90）。</summary>
+    public double Intensity { get; set; } = 40;
+
+    /// <summary>数量：频谱采样（柱/曲线点）总数（16–128）。</summary>
+    public int BandCount { get; set; } = 32;
+
+    /// <summary>宽度范围 = 窗口宽度百分比（20–100）。</summary>
+    public double WidthPct { get; set; } = 100;
 
     public double Opacity { get; set; } = 0.8;
 
@@ -223,9 +229,6 @@ public sealed class SpectrumFxSettings
 
     /// <summary>FFT 平滑帧数（1–10，越大越柔和）。</summary>
     public int Smoothing { get; set; } = 3;
-
-    /// <summary>中轴对称镜像（柱状/曲线从中线上下展开）。</summary>
-    public bool Mirror { get; set; }
 }
 
 /// <summary>飘雪动效设置。</summary>

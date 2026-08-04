@@ -74,14 +74,36 @@ public sealed partial class SettingsViewModel
         }
     }
 
-    public double SpectrumHeightVal
+    public double SpectrumIntensityVal
     {
-        get => _settings.Current.BackgroundFx.Spectrum.Height;
+        get => _settings.Current.BackgroundFx.Spectrum.Intensity;
         set
         {
             var v = Math.Round(value);
-            if (Math.Abs(v - _settings.Current.BackgroundFx.Spectrum.Height) < 1) return;
-            _settings.Update(s => s.BackgroundFx.Spectrum.Height = v);
+            if (Math.Abs(v - _settings.Current.BackgroundFx.Spectrum.Intensity) < 1) return;
+            _settings.Update(s => s.BackgroundFx.Spectrum.Intensity = v);
+        }
+    }
+
+    public double SpectrumBandCountVal
+    {
+        get => _settings.Current.BackgroundFx.Spectrum.BandCount;
+        set
+        {
+            var v = (int)Math.Round(value);
+            if (v == _settings.Current.BackgroundFx.Spectrum.BandCount) return;
+            _settings.Update(s => s.BackgroundFx.Spectrum.BandCount = Math.Clamp(v, 16, 128));
+        }
+    }
+
+    public double SpectrumWidthVal
+    {
+        get => _settings.Current.BackgroundFx.Spectrum.WidthPct;
+        set
+        {
+            var v = Math.Round(value);
+            if (Math.Abs(v - _settings.Current.BackgroundFx.Spectrum.WidthPct) < 1) return;
+            _settings.Update(s => s.BackgroundFx.Spectrum.WidthPct = Math.Clamp(v, 20, 100));
         }
     }
 
@@ -136,16 +158,6 @@ public sealed partial class SettingsViewModel
             var v = (int)Math.Round(value);
             if (v == _settings.Current.BackgroundFx.Spectrum.Smoothing) return;
             _settings.Update(s => s.BackgroundFx.Spectrum.Smoothing = Math.Clamp(v, 1, 10));
-        }
-    }
-
-    public bool SpectrumMirrorEnabled
-    {
-        get => _settings.Current.BackgroundFx.Spectrum.Mirror;
-        set
-        {
-            if (value == SpectrumMirrorEnabled) return;
-            _settings.Update(s => s.BackgroundFx.Spectrum.Mirror = value);
         }
     }
 

@@ -5,20 +5,22 @@ namespace EasyDesktopLyrics.Services;
 
 /// <summary>
 /// 频谱引擎：优先 WASAPI 环回采集真实音频做 FFT；采集不可用时自动回退到
-/// 播放状态驱动的模拟频谱。对外暴露 32 个归一化频带（0~1），供渲染层按需读取。
+/// 播放状态驱动的模拟频谱。对外暴露 N 个归一化频带（0~1，N 可配置）。
+/// 真实路径：汉明窗 → FFT → 频段聚合（对数分布 + 频段补偿曲线）→ 平滑。
 /// </summary>
 public sealed class SpectrumEngine : IDisposable
 {
     private const int FftSize = 1024;
-    private const int BandCount = 32;
     private const int MinFreq = 40;
     private const int MaxFreq = 16000;
+    private const int DefaultBandCount = 32;
 
     private readonly object _lock = new();
     private readonly List<float> _samples = new(FftSize * 2);
     private readonly Complex[] _fftBuf = new Complex[FftSize];
-    private readonly float[] _target = new float[BandCount];
-    private readonly float[] _smoothed = new float[BandCount];
+    private readonly double[] _hamming = new double[FftSize];
+    private float[] _target = new float[DefaultBandCount];
+    private float[] _smoothed = new float[DefaultBandCount];
     private readonly WasapiLoopbackCapture? _capture;
     private bool _real;
     private bool _disposed;
@@ -30,6 +32,8 @@ public sealed class SpectrumEngine : IDisposable
 
     public SpectrumEngine()
     {
+        for (var i = 0; i < FftSize; i++)
+            _hamming[i] = 0.54 - 0.46 * Math.Cos(2 * Math.PI * i / (FftSize - 1));
         _capture = new WasapiLoopbackCapture();
         _capture.DataAvailable += OnData;
     }
@@ -37,7 +41,7 @@ public sealed class SpectrumEngine : IDisposable
     /// <summary>true = 真实环回频谱；false = 模拟回退。</summary>
     public bool IsReal => _real;
 
-    public int Count => BandCount;
+    public int Count => _smoothed.Length;
 
     public event Action<bool>? SourceChanged;
 
@@ -85,7 +89,20 @@ public sealed class SpectrumEngine : IDisposable
 
     private int _smoothing = 3;
 
-    /// <summary>当前频带快照（长度 BandCount，0~1，内部复用数组）。</summary>
+    /// <summary>设置频带数量（16–128），动态调整输出数组。</summary>
+    public void SetBandCount(int count)
+    {
+        count = Math.Clamp(count, 16, 128);
+        lock (_lock)
+        {
+            if (count == _smoothed.Length)
+                return;
+            Array.Resize(ref _target, count);
+            Array.Resize(ref _smoothed, count);
+        }
+    }
+
+    /// <summary>当前频带快照（长度 = Count，0~1，内部复用数组）。</summary>
     public float[] GetBands()
     {
         if (_real)
@@ -109,31 +126,33 @@ public sealed class SpectrumEngine : IDisposable
 
     private float[] ComputeRealBands()
     {
+        var count = _smoothed.Length;
         lock (_lock)
         {
             if (_samples.Count < FftSize)
             {
-                DecayToZero();
+                DecayToZero(count);
                 return _smoothed;
             }
 
             var start = _samples.Count - FftSize;
             for (var i = 0; i < FftSize; i++)
-                _fftBuf[i] = new Complex(_samples[start + i], 0);
+                _fftBuf[i] = new Complex(_samples[start + i] * _hamming[i], 0);
         }
 
         FftSharp.FFT.Forward(_fftBuf);
-        FillTargetFromMagnitudes();
-        return SmoothAndReturn();
+        FillTargetFromMagnitudes(count);
+        return SmoothAndReturn(count);
     }
 
-    private void FillTargetFromMagnitudes()
+    /// <summary>对数频段聚合 + 频段补偿曲线（低频补强、高频适度滚降，视觉更平衡）。</summary>
+    private void FillTargetFromMagnitudes(int count)
     {
         var nyquist = _sampleRate / 2.0;
-        for (var b = 0; b < BandCount; b++)
+        for (var b = 0; b < count; b++)
         {
-            var f0 = MinFreq * Math.Pow((double)MaxFreq / MinFreq, (double)b / BandCount);
-            var f1 = MinFreq * Math.Pow((double)MaxFreq / MinFreq, (double)(b + 1) / BandCount);
+            var f0 = MinFreq * Math.Pow((double)MaxFreq / MinFreq, (double)b / count);
+            var f1 = MinFreq * Math.Pow((double)MaxFreq / MinFreq, (double)(b + 1) / count);
             var k0 = Math.Max(2, (int)(f0 / nyquist * (FftSize / 2)));
             var k1 = Math.Min(FftSize / 2, (int)(f1 / nyquist * (FftSize / 2)) + 1);
             if (k1 <= k0)
@@ -145,20 +164,43 @@ public sealed class SpectrumEngine : IDisposable
             for (var k = k0; k < k1; k++)
                 sum += _fftBuf[k].Magnitude;
             var norm = sum / (k1 - k0) / (FftSize / 2.0);
-            _target[b] = (float)Math.Clamp(norm * 2.0, 0, 1);
+            var gain = CompensationGain(f0, f1);
+            _target[b] = (float)Math.Clamp(norm * 2.0 * gain, 0, 1);
         }
+    }
+
+    /// <summary>频段补偿增益曲线（线性插值）：20Hz 起低频补强，高频渐进滚降。</summary>
+    private static double CompensationGain(double fLo, double fHi)
+    {
+        ReadOnlySpan<double> freqs = [20, 50, 100, 200, 500, 1000, 2000, 4000, 8000, 16000, 20000];
+        ReadOnlySpan<double> gains = [1.6, 1.5, 1.3, 1.1, 1.0, 1.0, 0.9, 0.75, 0.6, 0.5, 0.45];
+        var f = (fLo + fHi) / 2;
+        if (f <= freqs[0])
+            return gains[0];
+        if (f >= freqs[^1])
+            return gains[^1];
+        for (var i = 0; i < freqs.Length - 1; i++)
+        {
+            if (f <= freqs[i + 1])
+            {
+                var t = (f - freqs[i]) / (freqs[i + 1] - freqs[i]);
+                return gains[i] + (gains[i + 1] - gains[i]) * t;
+            }
+        }
+        return 1.0;
     }
 
     // ---------- 模拟频谱 ----------
 
     private float[] ComputeSimulatedBands()
     {
+        var count = _smoothed.Length;
         lock (_lock)
         {
             _simTime += 0.033;
-            for (var b = 0; b < BandCount; b++)
+            for (var b = 0; b < count; b++)
             {
-                var x = b / (double)BandCount;
+                var x = b / (double)count;
                 var t = _simTime;
                 var v =
                     0.5 + 0.5 * Math.Sin(x * 2.3 + t * 1.3)
@@ -170,16 +212,16 @@ public sealed class SpectrumEngine : IDisposable
                 _target[b] = (float)(v * envelope * _playingLevel);
             }
         }
-        return SmoothAndReturn();
+        return SmoothAndReturn(count);
     }
 
     // ---------- 平滑与输出 ----------
 
-    private float[] SmoothAndReturn()
+    private float[] SmoothAndReturn(int count)
     {
         var attack = 1.0f / (1 + _smoothing);
         var decay = (float)Math.Pow(0.985, _smoothing * 2);
-        for (var i = 0; i < BandCount; i++)
+        for (var i = 0; i < count; i++)
         {
             // 非线性提升（^0.7）：小信号更明显，让频谱视觉上更饱满
             var t = (float)Math.Pow(Math.Clamp(_target[i], 0, 1), 0.7);
@@ -191,14 +233,12 @@ public sealed class SpectrumEngine : IDisposable
         return _smoothed;
     }
 
-    private void DecayToZero()
+    private void DecayToZero(int count)
     {
         var decay = (float)Math.Pow(0.96, _smoothing * 2);
-        for (var i = 0; i < BandCount; i++)
+        for (var i = 0; i < count; i++)
             _smoothed[i] *= decay;
     }
-
-    // ---------- FFT（由 FftSharp 提供） ----------
 
     public void Dispose()
     {
