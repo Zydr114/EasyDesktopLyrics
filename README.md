@@ -109,6 +109,10 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 
 - [BetterLyrics](https://github.com/jayfunc/BetterLyrics)：本次更新的背景动效（尤其是频谱可视化）参考了它的源码与设计思路，包括双声道镜像布局、时域自动增益、低音驱动呼吸缩放、频段补偿与平滑策略等。感谢作者的开源分享。
 
+## 第三方依赖
+
+- [FftSharp](https://github.com/swharden/FftSharp)（[MIT](https://licenses.nuget.org/MIT)）：频谱 FFT 变换库，用于背景动效的频谱分析。
+
 ## License
 
 [MIT](LICENSE)
