@@ -181,7 +181,8 @@ public sealed class SpectrumEngine : IDisposable
         var decay = (float)Math.Pow(0.985, _smoothing * 2);
         for (var i = 0; i < BandCount; i++)
         {
-            var t = _target[i];
+            // 非线性提升（^0.7）：小信号更明显，让频谱视觉上更饱满
+            var t = (float)Math.Pow(Math.Clamp(_target[i], 0, 1), 0.7);
             var prev = _smoothed[i];
             _smoothed[i] = t > prev ? prev + (t - prev) * attack : prev * decay;
             if (_smoothed[i] < 0.001f)

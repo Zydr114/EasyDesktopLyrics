@@ -110,17 +110,28 @@ public sealed class SpectrumFxControl : Control
         _strokePen = new Pen(solid, 2);
     }
 
+    /// <summary>
+    /// 频谱锚定区域：顶部 = 窗口顶部；底部 = 窗口底部；行中央 = 以歌词行垂直中心为准。
+    /// 频谱绘制在歌词背面，与歌词重叠时自然位于文字后方。
+    /// </summary>
     private Rect AnchorRect()
     {
         var b = Bounds;
-        var r = LyricsRect ?? new Rect(0, 0, b.Width, b.Height);
+        var h = Math.Min(_height, Math.Max(0, b.Height));
+        if (h <= 0 || b.Width <= 0)
+            return new Rect(0, 0, b.Width, 0);
+
+        var centerY = LyricsRect is { Height: > 0 } lr
+            ? lr.Y + lr.Height / 2
+            : b.Height / 2;
         var y = _position switch
         {
-            "Top" => r.Top,
-            "Center" => r.Top + (r.Height - _height) / 2,
-            _ => r.Bottom - _height,
+            "Top" => 0,
+            "Center" => centerY - h / 2,
+            _ => b.Height - h,
         };
-        return new Rect(0, Math.Max(0, y), b.Width, Math.Min(_height, b.Height - Math.Max(0, y)));
+        y = Math.Clamp(y, 0, Math.Max(0, b.Height - h));
+        return new Rect(0, y, b.Width, h);
     }
 
     private void DrawBars(DrawingContext context, float[] bands, Rect rect)

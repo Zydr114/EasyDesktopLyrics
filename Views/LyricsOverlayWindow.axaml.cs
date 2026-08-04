@@ -104,6 +104,7 @@ public sealed partial class LyricsOverlayWindow : Window
         _bgFx.SetScreenRect(() => _hwnd == IntPtr.Zero
             ? (0, 0, 0, 0)
             : Win32.GetWindowScreenRect(_hwnd) ?? (0, 0, 0, 0));
+        _bgFx.SetPlaying(_vm.IsPlaying);
         _bgFx.SetWindowVisible(false);
 
         BuildTextLayers();
@@ -440,7 +441,10 @@ public sealed partial class LyricsOverlayWindow : Window
         if (e.PropertyName == nameof(OverlayViewModel.WindowVisible))
             UpdateVisibility();
         else if (e.PropertyName == nameof(OverlayViewModel.IsPlaying))
+        {
             UpdatePlayPauseIcon();
+            _bgFx.SetPlaying(_vm.IsPlaying);
+        }
         else if (e.PropertyName == nameof(OverlayViewModel.Phase))
             OnLyricsPhaseChanged();
         else if (e.PropertyName == nameof(OverlayViewModel.CoverTrackKey))
@@ -452,8 +456,6 @@ public sealed partial class LyricsOverlayWindow : Window
                 CoverImage.Source = _vm.CoverImage;
             _bgFx.SetCoverImage(_vm.CoverImage);
         }
-        else if (e.PropertyName == nameof(OverlayViewModel.IsPlaying))
-            _bgFx.SetPlaying(_vm.IsPlaying);
         else if (e.PropertyName == nameof(OverlayViewModel.MaxTextWidth))
         {
             // 歌词区域宽度上限变化：常驻时同步（动画期间由动画状态管理）
@@ -1574,6 +1576,7 @@ public sealed partial class LyricsOverlayWindow : Window
     public void UpdateVisibility()
     {
         if (_vm.WindowVisible) Show(); else Hide();
+        _bgFx.SetPlaying(_vm.IsPlaying);
         _bgFx.SetWindowVisible(IsVisible);
     }
 
