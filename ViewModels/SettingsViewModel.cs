@@ -111,6 +111,15 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         nameof(CoverArtistShadowBlurVal), nameof(CoverArtistShadowOffsetYVal),
         nameof(SelectedPresetIndex), nameof(PositionXPct), nameof(PositionYPct), nameof(AlignmentIndex), nameof(SelectedFontFamily),
         nameof(HeightGrowIndex),
+        nameof(BgFps),
+        nameof(SpectrumEnabled), nameof(SpectrumPositionIndex), nameof(SpectrumStyleIndex),
+        nameof(SpectrumHeightVal), nameof(SpectrumOpacityVal), nameof(SpectrumColorValue),
+        nameof(SpectrumGlowEnabled), nameof(SpectrumGlowStrengthVal),
+        nameof(SpectrumSmoothingVal), nameof(SpectrumMirrorEnabled),
+        nameof(SnowEnabled), nameof(SnowIntensityVal), nameof(SnowWidthVal), nameof(SnowOpacityVal),
+        nameof(SnowSizeVal), nameof(SnowSpeedVal), nameof(SnowColorValue),
+        nameof(FogEnabled), nameof(FogOpacityVal), nameof(FogSoftnessVal), nameof(FogFlowVal),
+        nameof(FogUseCoverEnabled), nameof(FogUseBackdropEnabled), nameof(FogBlendVal), nameof(FogAnimatedEnabled),
     ];
 
     private readonly SettingsService _settings;
@@ -179,6 +188,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         new("\uE7B5", "歌词封面"),
         new("\uE7C4", "显示"),
         new("\uE8FD", "校正"),
+        new("\uE768", "背景动效"),
     ];
 
     public bool PlayNavSelected => _selectedNav == 0;
@@ -187,6 +197,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     public bool CoverNavSelected => _selectedNav == 3;
     public bool DisplayNavSelected => _selectedNav == 4;
     public bool FixNavSelected => _selectedNav == 5;
+    public bool BackgroundFxNavSelected => _selectedNav == 6;
 
     private int _selectedNav;
 
@@ -198,7 +209,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
             if (Set(ref _selectedNav, value))
                 RaiseMany([nameof(PlayNavSelected), nameof(AppearanceNavSelected),
                            nameof(EffectsNavSelected), nameof(CoverNavSelected),
-                           nameof(DisplayNavSelected), nameof(FixNavSelected)]);
+                           nameof(DisplayNavSelected), nameof(FixNavSelected),
+                           nameof(BackgroundFxNavSelected)]);
         }
     }
 

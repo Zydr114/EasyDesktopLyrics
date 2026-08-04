@@ -24,14 +24,15 @@ public sealed partial class SettingsWindow : Window
             new CoverSettingsView(),
             new DisplaySettingsView(),
             new FixSettingsView(),
+            new BackgroundFxSettingsView(),
         ];
-        ContentHost.Content = _views[Math.Clamp(vm.SelectedNav, 0, 5)];
+        ContentHost.Content = _views[Math.Clamp(vm.SelectedNav, 0, 6)];
 
         _vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(SettingsViewModel.SelectedNav))
             {
-                ContentHost.Content = _views[Math.Clamp(_vm.SelectedNav, 0, 5)];
+                ContentHost.Content = _views[Math.Clamp(_vm.SelectedNav, 0, 6)];
                 ContentScroll.Offset = Vector.Zero;
             }
         };

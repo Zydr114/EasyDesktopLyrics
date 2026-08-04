@@ -1,0 +1,217 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:EasyDesktopLyrics.ViewModels"
+             xmlns:local="using:EasyDesktopLyrics.Views"
+             x:Class="EasyDesktopLyrics.Views.BackgroundFxSettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+  <StackPanel Spacing="12">
+    <!-- 全局 -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <StackPanel Spacing="2">
+          <TextBlock Classes="cardTitle" Text="背景动效" />
+          <TextBlock Classes="cardDesc"
+                     Text="在歌词背面的视觉效果（频谱 / 飘雪 / 雾层），默认全部关闭。所有效果仅在歌词窗口显示时运行，与播放/暂停无关。" />
+        </StackPanel>
+        <Grid ColumnDefinitions="140,*" ColumnSpacing="14">
+          <TextBlock Classes="sectionLabel" Text="渲染帧率 (fps)" />
+          <Grid Grid.Column="1" ColumnDefinitions="*,64" ColumnSpacing="14">
+            <Slider Minimum="30" Maximum="120" TickFrequency="5"
+                    Value="{Binding BgFps, Mode=TwoWay}" />
+            <TextBox Grid.Column="1" MinHeight="28" Padding="8,2"
+                     Text="{Binding BgFps, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                     TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+          </Grid>
+        </Grid>
+        <TextBlock Text="⚠ 帧率越高 CPU / GPU 占用越大（尤其是频谱）。普通使用建议保持 30fps，追求流畅可调至 60；120fps 仅适合高性能设备。" FontSize="11" Opacity="0.7" TextWrapping="Wrap" />
+      </StackPanel>
+    </Border>
+
+    <!-- 频谱 -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <StackPanel Spacing="2">
+            <TextBlock Classes="cardTitle" Text="频谱" />
+            <TextBlock Classes="cardDesc"
+                       Text="显示在歌词背面的实时频谱。优先采集系统正在播放的音频（WASAPI 环回）；采集不可用时自动回退为模拟频谱。" />
+          </StackPanel>
+          <ToggleSwitch Grid.Column="1" IsChecked="{Binding SpectrumEnabled, Mode=TwoWay}"
+                        OnContent="" OffContent="" VerticalAlignment="Center" />
+        </Grid>
+        <Border IsVisible="{Binding SpectrumEnabled}">
+          <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="140,*,150" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="位置" />
+              <ComboBox Grid.Column="1" ItemsSource="{Binding SpectrumPositionOptions}"
+                        SelectedIndex="{Binding SpectrumPositionIndex, Mode=TwoWay}" />
+              <Grid Grid.Column="2" ColumnDefinitions="*,64" ColumnSpacing="10">
+                <Slider Minimum="20" Maximum="400" TickFrequency="10"
+                        Value="{Binding SpectrumHeightVal, Mode=TwoWay}" ToolTip.Tip="高度 (px)" />
+                <TextBox Grid.Column="1" MinHeight="28" Padding="8,2"
+                         Text="{Binding SpectrumHeightVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+              </Grid>
+            </Grid>
+            <Grid ColumnDefinitions="140,*" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="样式" />
+              <ComboBox Grid.Column="1" ItemsSource="{Binding SpectrumStyleOptions}"
+                        SelectedIndex="{Binding SpectrumStyleIndex, Mode=TwoWay}" HorizontalAlignment="Left" MinWidth="160" />
+            </Grid>
+            <Grid ColumnDefinitions="140,*" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="颜色" />
+              <local:ColorPicker Grid.Column="1" Color="{Binding SpectrumColorValue, Mode=TwoWay}" />
+            </Grid>
+            <Grid ColumnDefinitions="140,*,64" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="不透明度" />
+              <Slider Grid.Column="1" Minimum="0.05" Maximum="1" TickFrequency="0.05"
+                      Value="{Binding SpectrumOpacityVal, Mode=TwoWay}" />
+              <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                       Text="{Binding SpectrumOpacityVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:P0}'}"
+                       TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+            </Grid>
+            <StackPanel Spacing="6">
+              <CheckBox Content="辉光" IsChecked="{Binding SpectrumGlowEnabled, Mode=TwoWay}" />
+              <Grid ColumnDefinitions="140,*,64" ColumnSpacing="14" Margin="20,0,0,0"
+                    IsVisible="{Binding SpectrumGlowEnabled}">
+                <TextBlock Classes="sectionLabel" Text="辉光强度" />
+                <Slider Grid.Column="1" Minimum="0" Maximum="2" TickFrequency="0.1"
+                        Value="{Binding SpectrumGlowStrengthVal, Mode=TwoWay}" />
+                <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                         Text="{Binding SpectrumGlowStrengthVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}'}"
+                         TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+              </Grid>
+            </StackPanel>
+            <Grid ColumnDefinitions="140,*,64" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="平滑" />
+              <Slider Grid.Column="1" Minimum="1" Maximum="10" TickFrequency="1"
+                      Value="{Binding SpectrumSmoothingVal, Mode=TwoWay}" />
+              <TextBlock Grid.Column="2" Text="1–10（越大越柔和）" FontSize="11" Opacity="0.6"
+                         VerticalAlignment="Center" HorizontalAlignment="Right" />
+            </Grid>
+            <CheckBox Content="中轴对称（镜像）" IsChecked="{Binding SpectrumMirrorEnabled, Mode=TwoWay}" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Border>
+
+    <!-- 飘雪 -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <StackPanel Spacing="2">
+            <TextBlock Classes="cardTitle" Text="飘雪" />
+            <TextBlock Classes="cardDesc" Text="在歌词窗口上悬浮飘落的雪花粒子，纯视觉、不影响点击。" />
+          </StackPanel>
+          <ToggleSwitch Grid.Column="1" IsChecked="{Binding SnowEnabled, Mode=TwoWay}"
+                        OnContent="" OffContent="" VerticalAlignment="Center" />
+        </Grid>
+        <Border IsVisible="{Binding SnowEnabled}">
+          <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="140,*,64" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="强度（粒子数）" />
+              <Slider Grid.Column="1" Minimum="20" Maximum="400" TickFrequency="10"
+                      Value="{Binding SnowIntensityVal, Mode=TwoWay}" />
+              <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                       Text="{Binding SnowIntensityVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
+                       TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+            </Grid>
+            <Grid ColumnDefinitions="140,*,64" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="飘雪范围 (宽度%)" />
+              <Slider Grid.Column="1" Minimum="20" Maximum="100" TickFrequency="5"
+                      Value="{Binding SnowWidthVal, Mode=TwoWay}" />
+              <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                       Text="{Binding SnowWidthVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}%'}"
+                       TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+            </Grid>
+            <Grid ColumnDefinitions="140,*,64" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="不透明度" />
+              <Slider Grid.Column="1" Minimum="0.05" Maximum="1" TickFrequency="0.05"
+                      Value="{Binding SnowOpacityVal, Mode=TwoWay}" />
+              <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                       Text="{Binding SnowOpacityVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:P0}'}"
+                       TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+            </Grid>
+            <Grid ColumnDefinitions="140,*,64" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="雪花大小" />
+              <Slider Grid.Column="1" Minimum="0.4" Maximum="3" TickFrequency="0.1"
+                      Value="{Binding SnowSizeVal, Mode=TwoWay}" />
+              <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                       Text="{Binding SnowSizeVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}×'}"
+                       TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+            </Grid>
+            <Grid ColumnDefinitions="140,*,64" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="下落速度" />
+              <Slider Grid.Column="1" Minimum="0.2" Maximum="3" TickFrequency="0.1"
+                      Value="{Binding SnowSpeedVal, Mode=TwoWay}" />
+              <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                       Text="{Binding SnowSpeedVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}×'}"
+                       TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+            </Grid>
+            <Grid ColumnDefinitions="140,*" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="颜色" />
+              <local:ColorPicker Grid.Column="1" Color="{Binding SnowColorValue, Mode=TwoWay}" />
+            </Grid>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Border>
+
+    <!-- 雾层 -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <StackPanel Spacing="2">
+            <TextBlock Classes="cardTitle" Text="雾层" />
+            <TextBlock Classes="cardDesc"
+                       Text="歌词窗口上柔和流动的彩色光晕。颜色取自窗口背后内容与当前歌曲封面（可分别开关），颜色可随时间流动。" />
+          </StackPanel>
+          <ToggleSwitch Grid.Column="1" IsChecked="{Binding FogEnabled, Mode=TwoWay}"
+                        OnContent="" OffContent="" VerticalAlignment="Center" />
+        </Grid>
+        <Border IsVisible="{Binding FogEnabled}">
+          <StackPanel Spacing="8">
+            <Grid ColumnDefinitions="140,*,64" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="不透明度" />
+              <Slider Grid.Column="1" Minimum="0.05" Maximum="1" TickFrequency="0.05"
+                      Value="{Binding FogOpacityVal, Mode=TwoWay}" />
+              <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                       Text="{Binding FogOpacityVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:P0}'}"
+                       TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+            </Grid>
+            <Grid ColumnDefinitions="140,*,64" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="柔和度（模糊感）" />
+              <Slider Grid.Column="1" Minimum="0.5" Maximum="3" TickFrequency="0.1"
+                      Value="{Binding FogSoftnessVal, Mode=TwoWay}" />
+              <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
+                       Text="{Binding FogSoftnessVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}'}"
+                       TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
+            </Grid>
+            <Grid ColumnDefinitions="140,*,64" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="颜色流动速度" />
+              <Slider Grid.Column="1" Minimum="0" Maximum="3" TickFrequency="0.1"
+                      Value="{Binding FogFlowVal, Mode=TwoWay}" />
+              <TextBlock Grid.Column="2" Text="0 = 静止" FontSize="11" Opacity="0.6"
+                         VerticalAlignment="Center" HorizontalAlignment="Right" />
+            </Grid>
+            <StackPanel Spacing="6">
+              <CheckBox Content="使用窗口背后屏幕颜色" IsChecked="{Binding FogUseBackdropEnabled, Mode=TwoWay}" />
+              <CheckBox Content="使用当前歌曲封面颜色" IsChecked="{Binding FogUseCoverEnabled, Mode=TwoWay}" />
+              <CheckBox Content="颜色流动（关闭 = 静态光晕）" IsChecked="{Binding FogAnimatedEnabled, Mode=TwoWay}" />
+            </StackPanel>
+            <Grid ColumnDefinitions="140,*,64" ColumnSpacing="14" Margin="20,0,0,0"
+                  IsVisible="{Binding FogUseCoverEnabled}">
+              <TextBlock Classes="sectionLabel" Text="封面 / 背后 混合" />
+              <Slider Grid.Column="1" Minimum="0" Maximum="1" TickFrequency="0.05"
+                      Value="{Binding FogBlendVal, Mode=TwoWay}" />
+              <TextBlock Grid.Column="2" Text="0=背后 1=封面" FontSize="11" Opacity="0.6"
+                         VerticalAlignment="Center" HorizontalAlignment="Right" />
+            </Grid>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Border>
+  </StackPanel>
+
+</UserControl>
