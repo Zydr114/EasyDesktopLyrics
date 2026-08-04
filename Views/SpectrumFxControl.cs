@@ -199,20 +199,19 @@ public sealed class SpectrumFxControl : Control
         if (n < 2)
             return;
 
-        // 单曲线（Line）不做 x 轴对称：行中央时按底部基线正常显示单根曲线
-        var effMode = !filled && mode == 0 ? -1 : mode;
-        var baseline = effMode switch { 1 => area.Top, -1 => area.Bottom, _ => area.Y + area.Height / 2 };
-        var maxPerSide = effMode == 0 ? area.Height / 2 : area.Height;
+        // 单曲线（Line）在行中央不做 x 轴对称镜像，但仍以歌词行中心为基线单侧生长（居中生效）
+        var baseline = mode switch { 1 => area.Top, -1 => area.Bottom, _ => area.Y + area.Height / 2 };
+        var maxPerSide = mode == 0 ? area.Height / 2 : area.Height;
         var step = area.Width / (n - 1);
 
         var points = new Point[n];
         for (var i = 0; i < n; i++)
         {
             var dy = bands[i] * maxPerSide;
-            points[i] = new Point(area.X + i * step, effMode == 1 ? baseline + dy : baseline - dy);
+            points[i] = new Point(area.X + i * step, mode == 1 ? baseline + dy : baseline - dy);
         }
 
-        var geo = BuildCurveGeometry(points, baseline, effMode, filled, area);
+        var geo = BuildCurveGeometry(points, baseline, mode, filled, area);
 
         if (_glowEnabled)
         {

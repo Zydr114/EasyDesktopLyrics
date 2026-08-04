@@ -10,9 +10,9 @@ namespace EasyDesktopLyrics.Services;
 /// </summary>
 public sealed class SpectrumEngine : IDisposable
 {
-    private const int FftSize = 1024;
+    private const int FftSize = 2048;
     private const int MinFreq = 40;
-    private const int MaxFreq = 16000;
+    private const int MaxFreq = 12000;
     private const int DefaultBandCount = 32;
 
     private readonly object _lock = new();
@@ -21,6 +21,8 @@ public sealed class SpectrumEngine : IDisposable
     private readonly double[] _hamming = new double[FftSize];
     private float[] _target = new float[DefaultBandCount];
     private float[] _smoothed = new float[DefaultBandCount];
+    private float[] _peakHold = new float[DefaultBandCount];
+    private double _autoPeak = 0.001;
     private readonly WasapiLoopbackCapture? _capture;
     private bool _real;
     private bool _disposed;
@@ -101,6 +103,7 @@ public sealed class SpectrumEngine : IDisposable
                 return;
             Array.Resize(ref _target, count);
             Array.Resize(ref _smoothed, count);
+            Array.Resize(ref _peakHold, count);
         }
     }
 
@@ -144,6 +147,8 @@ public sealed class SpectrumEngine : IDisposable
 
         FftSharp.FFT.Forward(_fftBuf);
         FillTargetFromMagnitudes(count);
+        ApplyAutoGain(count);
+        ApplyBassPump(count);
         return SmoothAndReturn(count);
     }
 
@@ -157,11 +162,9 @@ public sealed class SpectrumEngine : IDisposable
             var f1 = MinFreq * Math.Pow((double)MaxFreq / MinFreq, (double)(b + 1) / count);
             var k0 = Math.Max(2, (int)(f0 / nyquist * (FftSize / 2)));
             var k1 = Math.Min(FftSize / 2, (int)(f1 / nyquist * (FftSize / 2)) + 1);
+            // 保证每个频段至少 1 个 bin，避免低频段被置 0（band 恒不动的根因）
             if (k1 <= k0)
-            {
-                _target[b] = 0;
-                continue;
-            }
+                k1 = Math.Min(FftSize / 2, k0 + 1);
             double sum = 0;
             for (var k = k0; k < k1; k++)
                 sum += _fftBuf[k].Magnitude;
@@ -171,11 +174,11 @@ public sealed class SpectrumEngine : IDisposable
         }
     }
 
-    /// <summary>频段补偿增益曲线（线性插值）：20Hz 起低频补强，高频渐进滚降。</summary>
+    /// <summary>频段补偿增益曲线（线性插值）：低频补强，高频温和滚降（不再压到 0.45）。</summary>
     private static double CompensationGain(double fLo, double fHi)
     {
-        ReadOnlySpan<double> freqs = [20, 50, 100, 200, 500, 1000, 2000, 4000, 8000, 16000, 20000];
-        ReadOnlySpan<double> gains = [1.6, 1.5, 1.3, 1.1, 1.0, 1.0, 0.9, 0.75, 0.6, 0.5, 0.45];
+        ReadOnlySpan<double> freqs = [20, 50, 100, 200, 500, 1000, 2000, 4000, 8000, 12000, 16000, 20000];
+        ReadOnlySpan<double> gains = [1.5, 1.4, 1.25, 1.1, 1.0, 1.0, 0.95, 0.85, 0.8, 0.8, 0.8, 0.8];
         var f = (fLo + fHi) / 2;
         if (f <= freqs[0])
             return gains[0];
@@ -190,6 +193,32 @@ public sealed class SpectrumEngine : IDisposable
             }
         }
         return 1.0;
+    }
+
+    /// <summary>自动增益：以 ~1.5s 半衰期的指数峰值把整体归一化到 0.85 上限，弱音乐也能满幅律动。</summary>
+    private void ApplyAutoGain(int count)
+    {
+        var peak = 0.0;
+        for (var b = 0; b < count; b++)
+            peak = Math.Max(peak, _target[b]);
+        _autoPeak = Math.Max(peak, _autoPeak * 0.998);
+        var gain = 0.85 / Math.Max(0.001, _autoPeak);
+        gain = Math.Min(gain, 3.0);
+        for (var b = 0; b < count; b++)
+            _target[b] = (float)Math.Min(1.0, _target[b] * gain);
+    }
+
+    /// <summary>低频律动调制（bass pump）：低频带平均能量放大全频谱，让整体随鼓点起伏。</summary>
+    private void ApplyBassPump(int count)
+    {
+        var bassN = Math.Min(7, count);
+        double bass = 0;
+        for (var b = 0; b < bassN; b++)
+            bass += _target[b];
+        bass = bassN > 0 ? bass / bassN : 0;
+        var pump = 1.0 + 0.35 * bass;
+        for (var b = 0; b < count; b++)
+            _target[b] = (float)Math.Min(1.0, _target[b] * pump);
     }
 
     // ---------- 模拟频谱 ----------
@@ -218,6 +247,8 @@ public sealed class SpectrumEngine : IDisposable
                 _target[b] = (float)(v * envelope * _playingLevel);
             }
         }
+        ApplyAutoGain(count);
+        ApplyBassPump(count);
         return SmoothAndReturn(count);
     }
 
@@ -226,11 +257,14 @@ public sealed class SpectrumEngine : IDisposable
     private float[] SmoothAndReturn(int count)
     {
         var attack = 1.0f / (1 + _smoothing);
-        var decay = (float)Math.Pow(0.985, _smoothing * 2);
+        var decay = (float)Math.Pow(0.99, _smoothing);
+        // 峰值保持：约 300ms 残影，弱频段不至于瞬间归零，频谱更饱满
+        var hold = (float)Math.Pow(0.5, 1.0 / (0.3 * 30));
         for (var i = 0; i < count; i++)
         {
+            _peakHold[i] = Math.Max(_target[i], _peakHold[i] * hold);
             // 非线性提升（^0.7）：小信号更明显，让频谱视觉上更饱满
-            var t = (float)Math.Pow(Math.Clamp(_target[i], 0, 1), 0.7);
+            var t = (float)Math.Pow(Math.Clamp(_peakHold[i], 0, 1), 0.7);
             var prev = _smoothed[i];
             _smoothed[i] = t > prev ? prev + (t - prev) * attack : prev * decay;
             if (_smoothed[i] < 0.001f)
