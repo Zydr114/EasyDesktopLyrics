@@ -14,7 +14,9 @@
         SizeToContent="Width">
 
   <Border CornerRadius="6" Padding="12,6">
-    <Grid x:Name="OuterGrid" RowDefinitions="Auto,Auto">
+    <Grid x:Name="FxRoot">
+      <!-- 背景动效层（频谱/飘雪/雾层）：由代码后置插入到最底层，纯视觉、不拦截鼠标 -->
+      <Grid x:Name="OuterGrid" RowDefinitions="Auto,Auto">
       <!-- 常驻布局：封面占位列 + 歌词列 + 对称占位列（歌词始终居中） -->
       <Grid x:Name="MainGrid" Grid.Row="0" ColumnDefinitions="Auto,Auto,Auto">
         <Border x:Name="CoverSlot" Grid.Column="0" Width="0" Height="0"
@@ -122,6 +124,7 @@
           </StackPanel>
         </Border>
       </Border>
+      </Grid>
     </Grid>
   </Border>
 

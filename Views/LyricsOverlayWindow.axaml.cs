@@ -26,6 +26,7 @@ public sealed partial class LyricsOverlayWindow : Window
 
     private readonly OverlayViewModel _vm;
     private readonly SettingsService _settingsService;
+    private readonly BackgroundFxLayer _bgFx;
     private readonly DispatcherTimer _topmostTimer;
     private readonly DispatcherTimer _hideControlsTimer;
     private readonly DispatcherTimer _coverStageTimer;
@@ -97,6 +98,14 @@ public sealed partial class LyricsOverlayWindow : Window
         DataContext = _vm = vm;
         _settingsService = settingsService;
 
+        // 背景动效层：插入到 FxRoot 最底层（歌词/封面之下），屏幕取色提供者 + 可见性联动
+        _bgFx = new BackgroundFxLayer(_settingsService);
+        FxRoot.Children.Insert(0, _bgFx);
+        _bgFx.SetScreenRect(() => _hwnd == IntPtr.Zero
+            ? (0, 0, 0, 0)
+            : Win32.GetWindowScreenRect(_hwnd) ?? (0, 0, 0, 0));
+        _bgFx.SetWindowVisible(false);
+
         BuildTextLayers();
 
         // 初始封面占位尺寸：未运行 UpdateCoverSize 前封面会按原图尺寸（如 512px）布局，
@@ -155,6 +164,13 @@ public sealed partial class LyricsOverlayWindow : Window
             // 扫光层跟随主行位置（行宽/布局变化后保持对齐）
             if (_lineAnimKind == "Shine" && _shineLayer != null)
                 PositionShineLayer();
+            // 背景动效：歌词行区域（频谱“行中央”定位基准）
+            if (LyricsArea.Bounds.Height > 0)
+            {
+                var origin = LyricsArea.TranslatePoint(new Point(0, 0), _bgFx);
+                if (origin.HasValue)
+                    _bgFx.SetLyricsRect(new Rect(origin.Value, LyricsArea.Bounds.Size));
+            }
         };
 
         _lastCoverEnabled = _vm.CoverEnabled;
@@ -434,7 +450,10 @@ public sealed partial class LyricsOverlayWindow : Window
             // 封面内容刷新（同歌重取等），不重放切歌动画
             if (_vm.CoverImage != null)
                 CoverImage.Source = _vm.CoverImage;
+            _bgFx.SetCoverImage(_vm.CoverImage);
         }
+        else if (e.PropertyName == nameof(OverlayViewModel.IsPlaying))
+            _bgFx.SetPlaying(_vm.IsPlaying);
         else if (e.PropertyName == nameof(OverlayViewModel.MaxTextWidth))
         {
             // 歌词区域宽度上限变化：常驻时同步（动画期间由动画状态管理）
@@ -1555,6 +1574,7 @@ public sealed partial class LyricsOverlayWindow : Window
     public void UpdateVisibility()
     {
         if (_vm.WindowVisible) Show(); else Hide();
+        _bgFx.SetWindowVisible(IsVisible);
     }
 
     private void ApplyAnchor()
