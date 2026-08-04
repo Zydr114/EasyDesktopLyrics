@@ -4,7 +4,9 @@ namespace EasyDesktopLyrics.Services;
 
 /// <summary>
 /// WASAPI 环回采集：捕获系统正在播放（render 端点）的音频，输出单声道 float 样本。
-/// 纯 P/Invoke（无第三方依赖），共享模式轮询读取（比事件回调兼容性更好，环回场景部分系统不支持 EVENTCALLBACK）。
+/// 纯 P/Invoke（无第三方依赖），实现对齐 cava input/winscap.c：
+/// 事件驱动采集（LOOPBACK | EVENTCALLBACK + SetEventHandle），16ms 缓冲；
+/// 事件回调不可用时回退 10ms 轮询；静音帧输出零样本；多声道按 cava 0.7 增益规则下混。
 /// 初始化失败时以 IsRunning=false / Error 返回，由频谱引擎回退模拟。
 /// 全部 COM 操作集中在专用线程（CoInitialize MTA → 采集循环 → CoUninitialize）。
 /// </summary>
@@ -14,10 +16,14 @@ public sealed class WasapiLoopbackCapture : IDisposable
     private const int ERoleConsole = 0;
     private const int CLSCTX_ALL = 0x17;
     private const int AUDCLNT_SHAREMODE_SHARED = 0;
-    private const int AUDCLNT_STREAMFLAGS_LOOPBACK = 0x2;
+    // audioclient.h（AUDCLNT_STREAMFLAGS_*，实测与本机运行时一致）：
+    // LOOPBACK=0x00020000, EVENTCALLBACK=0x00040000, NOPERSIST=0x00080000
+    private const int AUDCLNT_STREAMFLAGS_LOOPBACK = 0x00020000;
+    private const int AUDCLNT_STREAMFLAGS_EVENTCALLBACK = 0x00040000;
     private const int DEVICE_STATEMASK_ACTIVE = 0x1;
     private const uint AUDCLNT_BUFFERFLAGS_SILENT = 0x2;
     private const uint COINIT_MULTITHREADED = 0x0;
+    private const long REFTIMES_PER_MILLISEC = 10000;
 
     private static readonly Guid IID_IAudioClient = new("1CB9AD4C-DBFA-4c32-B178-C2F568A703B2");
     private static readonly Guid IID_IAudioCaptureClient = new("C8ADBD64-E71E-48a0-A4DE-185C395CD317");
@@ -76,6 +82,8 @@ public sealed class WasapiLoopbackCapture : IDisposable
     private int _bytesPerSample;
     private bool _floatFormat;
     private byte[] _work = new byte[0];
+    private readonly double[] _chan = new double[8];
+    private IntPtr _eventHandle;
 
     private Exception? _lastDeviceError;
 
@@ -148,22 +156,32 @@ public sealed class WasapiLoopbackCapture : IDisposable
             if ((_floatFormat && fmt.wBitsPerSample != 32) || (!_floatFormat && fmt.wBitsPerSample != 16))
                 throw new NotSupportedException($"unsupported format {fmt.wBitsPerSample}bit float={_floatFormat}");
 
+            // 事件驱动环回（对齐 cava：16ms 缓冲）
             hr = _client.Initialize(
                 AUDCLNT_SHAREMODE_SHARED,
-                AUDCLNT_STREAMFLAGS_LOOPBACK,
-                0, 0, fmtPtr, IntPtr.Zero);
-            // 部分设备在缓冲区参数为 0 时拒绝：重试 200ms 缓冲区
+                AUDCLNT_STREAMFLAGS_LOOPBACK | AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
+                16 * REFTIMES_PER_MILLISEC, 0, fmtPtr, IntPtr.Zero);
             if (hr < 0)
-                hr = _client.Initialize(
-                    AUDCLNT_SHAREMODE_SHARED,
-                    AUDCLNT_STREAMFLAGS_LOOPBACK,
-                    2000000, 0, fmtPtr, IntPtr.Zero);
-            if (hr < 0)
-                throw new InvalidOperationException($"Initialize(loopback) hr=0x{hr:X8}");
+                throw new InvalidOperationException($"Initialize(loopback|event) hr=0x{hr:X8}");
 
             hr = _client.GetBufferSize(out _);
             if (hr < 0)
                 throw new InvalidOperationException($"GetBufferSize hr=0x{hr:X8}");
+
+            // 注册数据就绪事件；失败则回退轮询（重新以非事件模式初始化）
+            _eventHandle = CreateEvent(IntPtr.Zero, true, false, null);
+            if (_eventHandle != IntPtr.Zero && _client.SetEventHandle(_eventHandle) < 0)
+            {
+                CloseHandle(_eventHandle);
+                _eventHandle = IntPtr.Zero;
+                _client.Reset();
+                hr = _client.Initialize(
+                    AUDCLNT_SHAREMODE_SHARED,
+                    AUDCLNT_STREAMFLAGS_LOOPBACK,
+                    16 * REFTIMES_PER_MILLISEC, 0, fmtPtr, IntPtr.Zero);
+                if (hr < 0)
+                    throw new InvalidOperationException($"Initialize(loopback poll) hr=0x{hr:X8}");
+            }
 
             var iidCapture = IID_IAudioCaptureClient;
             hr = _client.GetService(ref iidCapture, out var pCaptureClient);
@@ -191,18 +209,18 @@ public sealed class WasapiLoopbackCapture : IDisposable
 
     private void CaptureLoop()
     {
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        long lastDrain = 0;
         try
         {
             while (_running)
             {
-                Thread.Sleep(5);
-                // 轮询 ~10ms：环回采集不支持事件回调时也兼容
-                if (sw.ElapsedMilliseconds - lastDrain < 10)
-                    continue;
-                lastDrain = sw.ElapsedMilliseconds;
+                // 事件驱动：等待数据就绪；事件不可用时退化为 10ms 轮询
+                if (_eventHandle != IntPtr.Zero)
+                    WaitForSingleObject(_eventHandle, 5000);
+                else
+                    Thread.Sleep(10);
                 Drain();
+                if (_eventHandle != IntPtr.Zero)
+                    ResetEvent(_eventHandle);
             }
         }
         catch (Exception ex)
@@ -219,10 +237,12 @@ public sealed class WasapiLoopbackCapture : IDisposable
             var hr = _captureClient.GetBuffer(out var data, out var numFrames, out var flags, out _, out _);
             if (hr < 0)
                 return;
-            if (numFrames > 0 && (flags & AUDCLNT_BUFFERFLAGS_SILENT) == 0)
+            if (numFrames > 0)
             {
-                var mono = ConvertToMono(data, (int)numFrames);
-                DataAvailable?.Invoke(mono);
+                // 静音帧输出零样本，让频谱在静音时正常回落（对齐 cava write_silent_frame）
+                DataAvailable?.Invoke((flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0
+                    ? ConvertSilence((int)numFrames)
+                    : ConvertToMono(data, (int)numFrames));
             }
             _captureClient.ReleaseBuffer(numFrames);
         }
@@ -237,19 +257,31 @@ public sealed class WasapiLoopbackCapture : IDisposable
 
         var mono = new float[frames];
         var step = _channels * _bytesPerSample;
+        var chans = Math.Min(_channels, _chan.Length);
         for (var i = 0; i < frames; i++)
         {
-            double sum = 0;
-            for (var c = 0; c < _channels; c++)
+            var off = i * step;
+            for (var c = 0; c < chans; c++)
             {
-                var off = i * step + c * _bytesPerSample;
-                sum += _floatFormat
-                    ? BitConverter.ToSingle(_work, off)
-                    : (short)(_work[off] | (_work[off + 1] << 8)) / 32768.0;
+                var o = off + c * _bytesPerSample;
+                _chan[c] = _floatFormat
+                    ? BitConverter.ToSingle(_work, o)
+                    : (short)(_work[o] | (_work[o + 1] << 8)) / 32768.0;
             }
-            mono[i] = (float)(sum / _channels);
+            // cava 下混规则：中置(3)、环绕(5/6)、后环绕(7/8) 以 0.7 增益混入 L/R
+            double left = 0, right = 0;
+            if (chans >= 2) { left += _chan[0]; right += _chan[1]; }
+            if (chans >= 3) { left += _chan[2] * 0.7; right += _chan[2] * 0.7; }
+            if (chans >= 5) { left += _chan[4] * 0.7; right += _chan[5] * 0.7; }
+            if (chans >= 7) { left += _chan[6] * 0.7; right += _chan[7] * 0.7; }
+            mono[i] = (float)((left + right) / 2);
         }
         return mono;
+    }
+
+    private static float[] ConvertSilence(int frames)
+    {
+        return new float[frames];
     }
 
     private void Cleanup()
@@ -265,6 +297,11 @@ public sealed class WasapiLoopbackCapture : IDisposable
         catch
         {
             // ignore
+        }
+        if (_eventHandle != IntPtr.Zero)
+        {
+            CloseHandle(_eventHandle);
+            _eventHandle = IntPtr.Zero;
         }
         _captureClient = null;
         try
@@ -305,6 +342,18 @@ public sealed class WasapiLoopbackCapture : IDisposable
 
     [DllImport("ole32.dll")]
     private static extern void CoUninitialize();
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    private static extern IntPtr CreateEvent(IntPtr lpEventAttributes, bool bManualReset, bool bInitialState, string? lpName);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool ResetEvent(IntPtr hEvent);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
+
+    [DllImport("kernel32.dll")]
+    private static extern bool CloseHandle(IntPtr hObject);
 
     [ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
     private class MMDeviceEnumeratorComObject
