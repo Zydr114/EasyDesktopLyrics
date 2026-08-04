@@ -122,7 +122,7 @@ public sealed class SpectrumEngine : IDisposable
                 _fftBuf[i] = new Complex(_samples[start + i], 0);
         }
 
-        Fft(_fftBuf);
+        FftSharp.FFT.Forward(_fftBuf);
         FillTargetFromMagnitudes();
         return SmoothAndReturn();
     }
@@ -198,42 +198,7 @@ public sealed class SpectrumEngine : IDisposable
             _smoothed[i] *= decay;
     }
 
-    // ---------- FFT ----------
-
-    private static void Fft(Span<Complex> data)
-    {
-        var n = data.Length;
-        for (var i = 1; i < n; i++)
-        {
-            var j = 0;
-            var bit = n >> 1;
-            while ((j & bit) != 0)
-            {
-                j ^= bit;
-                bit >>= 1;
-            }
-            j ^= bit;
-            if (i < j)
-                (data[i], data[j]) = (data[j], data[i]);
-        }
-        for (var len = 2; len <= n; len <<= 1)
-        {
-            var ang = -2 * Math.PI / len;
-            var wlen = new Complex(Math.Cos(ang), Math.Sin(ang));
-            for (var i = 0; i < n; i += len)
-            {
-                var w = new Complex(1, 0);
-                for (var k = 0; k < len / 2; k++)
-                {
-                    var u = data[i + k];
-                    var v = data[i + k + len / 2] * w;
-                    data[i + k] = u + v;
-                    data[i + k + len / 2] = u - v;
-                    w *= wlen;
-                }
-            }
-        }
-    }
+    // ---------- FFT（由 FftSharp 提供） ----------
 
     public void Dispose()
     {
