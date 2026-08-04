@@ -1,5 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using EasyDesktopLyrics.ViewModels;
 
@@ -37,7 +39,20 @@ public sealed partial class SettingsWindow : Window
             }
         };
 
+        // 数值文本框：回车确认输入并移到下一焦点（触发 LostFocus 提交 TwoWay 绑定）
+        AddHandler(InputElement.KeyDownEvent, OnEnterKeyDown, RoutingStrategies.Tunnel);
+
         Opened += (_, _) => FitToScreen();
+    }
+
+    private void OnEnterKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || e.Source is not TextBox)
+            return;
+        // 移到下一可聚焦元素；失败则把焦点还给窗口，两者都会触发当前 TextBox 的 LostFocus 提交
+        if (!(FocusManager?.TryMoveFocus(NavigationDirection.Next) ?? false))
+            Focus();
+        e.Handled = true;
     }
 
     /// <summary>
