@@ -105,6 +105,10 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 - 应用不收集任何数据，不注册开机自启（除非自行配置）。
 - 歌词接口均为各平台非官方公开接口，仅供个人学习使用；请在符合平台条款的前提下使用。
 
+## 致谢
+
+- [BetterLyrics](https://github.com/jayfunc/BetterLyrics)：本次更新的背景动效（尤其是频谱可视化）参考了它的源码与设计思路，包括双声道镜像布局、时域自动增益、低音驱动呼吸缩放、频段补偿与平滑策略等。感谢作者的开源分享。
+
 ## License
 
 [MIT](LICENSE)
