@@ -218,8 +218,11 @@ public sealed class SpectrumFxSettings
     /// <summary>宽度范围 = 窗口宽度百分比（20–100）。</summary>
     public double WidthPct { get; set; } = 100;
 
-    /// <summary>居中低音（蝴蝶布局）：低频居中、向两侧对称升到高频；false = 传统左低右高。</summary>
+    /// <summary>L/R 镜像布局：左右声道分离、低频居中、两侧高频且左右不同；false = 传统单频谱左低右高。</summary>
     public bool CenterBass { get; set; } = true;
+
+    /// <summary>呼吸强度：低音驱动整个频谱缩放（0–100，0 关闭）。</summary>
+    public int Breathing { get; set; } = 25;
 
     public double Opacity { get; set; } = 0.8;
 

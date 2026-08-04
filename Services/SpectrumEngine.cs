@@ -4,9 +4,11 @@ using EasyDesktopLyrics.Infrastructure;
 namespace EasyDesktopLyrics.Services;
 
 /// <summary>
-/// 频谱引擎：优先 WASAPI 环回采集真实音频做 FFT；采集不可用时自动回退到
-/// 播放状态驱动的模拟频谱。对外暴露 N 个归一化频带（0~1，N 可配置）。
-/// 真实路径：汉明窗 → FFT → 频段聚合（对数分布 + 频段补偿曲线）→ 平滑。
+/// 频谱引擎：优先 WASAPI 环回采集真实音频做双声道 FFT；采集不可用时自动回退到
+/// 播放状态驱动的模拟频谱（伪立体声）。
+/// 真实路径：时域自动增益 → 汉明窗 → L/R 各自 FFT → 对数频段聚合（+中高频补偿）→
+/// 轻量 bass pump → 高频活性增强 → 峰值保持平滑。
+/// 对外暴露一帧 L/R 频带快照（0~1）与 BassEnergy（0~1，供渲染呼吸缩放）。
 /// </summary>
 public sealed class SpectrumEngine : IDisposable
 {
@@ -16,13 +18,16 @@ public sealed class SpectrumEngine : IDisposable
     private const int DefaultBandCount = 32;
 
     private readonly object _lock = new();
-    private readonly List<float> _samples = new(FftSize * 2);
-    private readonly Complex[] _fftBuf = new Complex[FftSize];
+    private readonly List<float> _samples = new(FftSize * 4);
+    private readonly Complex[] _fftBufL = new Complex[FftSize];
+    private readonly Complex[] _fftBufR = new Complex[FftSize];
     private readonly double[] _hamming = new double[FftSize];
-    private float[] _target = new float[DefaultBandCount];
-    private float[] _smoothed = new float[DefaultBandCount];
-    private float[] _peakHold = new float[DefaultBandCount];
-    private double _autoPeak = 0.001;
+    private float[] _targetL = new float[DefaultBandCount];
+    private float[] _targetR = new float[DefaultBandCount];
+    private float[] _smoothedL = new float[DefaultBandCount];
+    private float[] _smoothedR = new float[DefaultBandCount];
+    private float[] _peakHoldL = new float[DefaultBandCount];
+    private float[] _peakHoldR = new float[DefaultBandCount];
     private readonly WasapiLoopbackCapture? _capture;
     private bool _real;
     private bool _disposed;
@@ -33,6 +38,11 @@ public sealed class SpectrumEngine : IDisposable
     private double _playingLevel;
     private readonly System.Diagnostics.Stopwatch _simClock = System.Diagnostics.Stopwatch.StartNew();
     private double _lastSimT;
+
+    // 时域自动增益（BetterLyrics 风格）
+    private float _maxDetectedVolume = 0.1f;
+    private bool _isMono;
+    private float _bassEnergy;
 
     public SpectrumEngine()
     {
@@ -45,7 +55,7 @@ public sealed class SpectrumEngine : IDisposable
     /// <summary>true = 真实环回频谱；false = 模拟回退。</summary>
     public bool IsReal => _real;
 
-    public int Count => _smoothed.Length;
+    public int Count => _smoothedL.Length;
 
     public event Action<bool>? SourceChanged;
 
@@ -99,62 +109,126 @@ public sealed class SpectrumEngine : IDisposable
         count = Math.Clamp(count, 16, 128);
         lock (_lock)
         {
-            if (count == _smoothed.Length)
+            if (count == _smoothedL.Length)
                 return;
-            Array.Resize(ref _target, count);
-            Array.Resize(ref _smoothed, count);
-            Array.Resize(ref _peakHold, count);
+            Array.Resize(ref _targetL, count);
+            Array.Resize(ref _targetR, count);
+            Array.Resize(ref _smoothedL, count);
+            Array.Resize(ref _smoothedR, count);
+            Array.Resize(ref _peakHoldL, count);
+            Array.Resize(ref _peakHoldR, count);
         }
     }
 
-    /// <summary>当前频带快照（长度 = Count，0~1，内部复用数组）。</summary>
-    public float[] GetBands()
+    /// <summary>当前帧 L/R 频带快照（长度 = Count，0~1）+ 低音能量。数组为内部复用，须当帧用完。</summary>
+    public SpectrumFrame GetFrame()
     {
         if (_real)
-            return ComputeRealBands();
-        return ComputeSimulatedBands();
+            return ComputeRealFrame();
+        return ComputeSimulatedFrame();
     }
 
     // ---------- 真实频谱 ----------
 
-    private void OnData(float[] mono)
+    private void OnData(float[] stereo)
     {
         lock (_lock)
         {
             if (_disposed || !_real)
                 return;
-            _samples.AddRange(mono);
+            _samples.AddRange(stereo);
             if (_samples.Count > FftSize * 4)
                 _samples.RemoveRange(0, _samples.Count - FftSize * 2);
         }
     }
 
-    private float[] ComputeRealBands()
+    private SpectrumFrame ComputeRealFrame()
     {
-        var count = _smoothed.Length;
+        var count = _smoothedL.Length;
         lock (_lock)
         {
-            if (_samples.Count < FftSize)
+            if (_samples.Count < FftSize * 2)
             {
                 DecayToZero(count);
-                return _smoothed;
+                _bassEnergy = 0;
+                return new SpectrumFrame(_smoothedL, _smoothedR, 0);
             }
 
-            var start = _samples.Count - FftSize;
+            var start = _samples.Count - FftSize * 2;
+            var gain = ComputeAutoGain(start, FftSize);
+            _isMono = DetectMono(start, FftSize);
+
             for (var i = 0; i < FftSize; i++)
-                _fftBuf[i] = new Complex(_samples[start + i] * _hamming[i], 0);
+            {
+                var w = _hamming[i];
+                _fftBufL[i] = new Complex(_samples[start + i * 2] * gain * w, 0);
+                _fftBufR[i] = new Complex(_samples[start + i * 2 + 1] * gain * w, 0);
+            }
         }
 
-        FftSharp.FFT.Forward(_fftBuf);
-        FillTargetFromMagnitudes(count);
-        ApplyAutoGain(count);
-        ApplyBassPump(count);
-        ApplyHighBoost(count);
-        return SmoothAndReturn(count);
+        FftSharp.FFT.Forward(_fftBufL);
+        FftSharp.FFT.Forward(_fftBufR);
+
+        FillTargetFromMagnitudes(count, _fftBufL, _targetL);
+        FillTargetFromMagnitudes(count, _fftBufR, _targetR);
+        ApplyBassPump(count, _targetL);
+        ApplyBassPump(count, _targetR);
+        ApplyHighBoost(count, _targetL);
+        ApplyHighBoost(count, _targetR);
+        SmoothAndReturn(count, _targetL, _smoothedL, _peakHoldL);
+        SmoothAndReturn(count, _targetR, _smoothedR, _peakHoldR);
+
+        // 伪立体声：单声道源（L≈R）时给 R 侧加轻微时变扰动，避免左右完全一致
+        if (_isMono)
+        {
+            var t = SimTime();
+            for (var b = 0; b < count; b++)
+                _smoothedR[b] *= (float)(1 + 0.06 * Math.Sin(b * 1.7 + t * 3));
+        }
+
+        UpdateBassEnergy(count);
+        return new SpectrumFrame(_smoothedL, _smoothedR, _bassEnergy);
     }
 
-    /// <summary>对数频段聚合 + 频段补偿曲线（低频补强、高频适度滚降，视觉更平衡）。</summary>
-    private void FillTargetFromMagnitudes(int count)
+    /// <summary>时域自动增益：帧峰值分段衰减估计，返回样本缩放倍率（替换 band 级归一化）。</summary>
+    private float ComputeAutoGain(int start, int frames)
+    {
+        float peak = 0;
+        for (var i = 0; i < frames * 2; i++)
+        {
+            var a = Math.Abs(_samples[start + i]);
+            if (a > peak) peak = a;
+        }
+        if (peak > _maxDetectedVolume)
+        {
+            _maxDetectedVolume = peak;
+        }
+        else
+        {
+            var ratio = _maxDetectedVolume > 0 ? peak / _maxDetectedVolume : 0f;
+            float decay = ratio < 0.2f ? 0.95f : ratio < 0.5f ? 0.99f : 0.9995f;
+            _maxDetectedVolume *= decay;
+        }
+        _maxDetectedVolume = Math.Max(0.02f, _maxDetectedVolume);
+        return (float)(1.0 / _maxDetectedVolume);
+    }
+
+    /// <summary>检测 L/R 是否近乎相同（单声道源）。</summary>
+    private bool DetectMono(int start, int frames)
+    {
+        double diff = 0, sum = 0;
+        for (var i = 0; i < frames; i++)
+        {
+            var l = _samples[start + i * 2];
+            var r = _samples[start + i * 2 + 1];
+            diff += Math.Abs(l - r);
+            sum += Math.Abs(l) + Math.Abs(r);
+        }
+        return sum > 1e-6 && diff / sum < 0.05;
+    }
+
+    /// <summary>对数频段聚合 + 频段补偿曲线（低频平缓、中高频大幅抬升，对齐 BetterLyrics）。</summary>
+    private void FillTargetFromMagnitudes(int count, Complex[] fftBuf, float[] target)
     {
         var nyquist = _sampleRate / 2.0;
         for (var b = 0; b < count; b++)
@@ -163,23 +237,23 @@ public sealed class SpectrumEngine : IDisposable
             var f1 = MinFreq * Math.Pow((double)MaxFreq / MinFreq, (double)(b + 1) / count);
             var k0 = Math.Max(2, (int)(f0 / nyquist * (FftSize / 2)));
             var k1 = Math.Min(FftSize / 2, (int)(f1 / nyquist * (FftSize / 2)) + 1);
-            // 保证每个频段至少 1 个 bin，避免低频段被置 0（band 恒不动的根因）
+            // 保证每个频段至少 1 个 bin，避免低频段被置 0
             if (k1 <= k0)
                 k1 = Math.Min(FftSize / 2, k0 + 1);
             double sum = 0;
             for (var k = k0; k < k1; k++)
-                sum += _fftBuf[k].Magnitude;
+                sum += fftBuf[k].Magnitude;
             var norm = sum / (k1 - k0) / (FftSize / 2.0);
             var gain = CompensationGain(f0, f1);
-            _target[b] = (float)Math.Clamp(norm * 2.0 * gain, 0, 1);
+            target[b] = (float)Math.Clamp(norm * 2.0 * gain, 0, 1);
         }
     }
 
-    /// <summary>频段补偿增益曲线（线性插值）：低频补强，高频不再滚降（配合 ApplyHighBoost 让高频也有内容）。</summary>
+    /// <summary>频段补偿增益曲线（线性插值）：中高频大幅抬升，让高频区真正活跃。</summary>
     private static double CompensationGain(double fLo, double fHi)
     {
         ReadOnlySpan<double> freqs = [20, 50, 100, 200, 500, 1000, 2000, 4000, 8000, 12000, 16000, 20000];
-        ReadOnlySpan<double> gains = [1.5, 1.4, 1.25, 1.1, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0];
+        ReadOnlySpan<double> gains = [1.1, 1.1, 1.1, 1.2, 1.4, 1.5, 2.2, 3.2, 5.0, 6.5, 7.5, 8.0];
         var f = (fLo + fHi) / 2;
         if (f <= freqs[0])
             return gains[0];
@@ -196,82 +270,92 @@ public sealed class SpectrumEngine : IDisposable
         return 1.0;
     }
 
-    /// <summary>自动增益：以 ~1.5s 半衰期的指数峰值把整体归一化到 0.85 上限，弱音乐也能满幅律动。</summary>
-    private void ApplyAutoGain(int count)
-    {
-        var peak = 0.0;
-        for (var b = 0; b < count; b++)
-            peak = Math.Max(peak, _target[b]);
-        _autoPeak = Math.Max(peak, _autoPeak * 0.998);
-        var gain = 0.85 / Math.Max(0.001, _autoPeak);
-        gain = Math.Min(gain, 3.0);
-        for (var b = 0; b < count; b++)
-            _target[b] = (float)Math.Min(1.0, _target[b] * gain);
-    }
-
     /// <summary>低频律动调制（bass pump）：低频带平均能量放大全频谱，让整体随鼓点起伏。</summary>
-    private void ApplyBassPump(int count)
+    private void ApplyBassPump(int count, float[] target)
     {
         var bassN = Math.Min(7, count);
         double bass = 0;
         for (var b = 0; b < bassN; b++)
-            bass += _target[b];
+            bass += target[b];
         bass = bassN > 0 ? bass / bassN : 0;
-        var pump = 1.0 + 0.35 * bass;
+        var pump = 1.0 + 0.2 * bass;
         for (var b = 0; b < count; b++)
-            _target[b] = (float)Math.Min(1.0, _target[b] * pump);
+            target[b] = (float)Math.Min(1.0, target[b] * pump);
     }
 
-    /// <summary>
-    /// 高频活性增强：对后 1/3 频段做非线性指数提升（越高频指数越小），
-    /// 音乐高频能量弱时也能明显起伏；配合峰值保持让高频区真正动起来。
-    /// </summary>
-    private void ApplyHighBoost(int count)
+    /// <summary>高频活性增强：对后 1/3 频段做非线性指数提升，弱高频也能明显起伏。</summary>
+    private void ApplyHighBoost(int count, float[] target)
     {
         var hiStart = count * 2 / 3;
         for (var b = hiStart; b < count; b++)
         {
             var t = (double)(b - hiStart) / Math.Max(1, count - 1 - hiStart);
             var exponent = 0.7 - 0.3 * t;
-            _target[b] = (float)Math.Min(1.0, Math.Pow(Math.Max(0.0001, _target[b]), exponent));
+            target[b] = (float)Math.Min(1.0, Math.Pow(Math.Max(0.0001, target[b]), exponent));
         }
     }
 
-    // ---------- 模拟频谱 ----------
-
-    private float[] ComputeSimulatedBands()
+    /// <summary>低音能量（低频前 7 band 平均，0~1），供渲染呼吸缩放。</summary>
+    private void UpdateBassEnergy(int count)
     {
-        var count = _smoothed.Length;
+        var bassN = Math.Min(7, count);
+        double bass = 0;
+        for (var b = 0; b < bassN; b++)
+            bass += _smoothedL[b];
+        _bassEnergy = bassN > 0 ? (float)Math.Clamp(bass / bassN, 0, 1) : 0;
+    }
+
+    // ---------- 模拟频谱（伪立体声） ----------
+
+    private SpectrumFrame ComputeSimulatedFrame()
+    {
+        var count = _smoothedL.Length;
+        var t = SimTime();
         lock (_lock)
         {
-            // 按真实流逝时间推进（与渲染帧率解耦，动画速度恒定）
-            var now = _simClock.Elapsed.TotalSeconds;
-            var dt = Math.Clamp(now - _lastSimT, 0, 0.1);
-            _lastSimT = now;
-            _simTime += dt;
             for (var b = 0; b < count; b++)
             {
                 var x = b / (double)count;
-                var t = _simTime;
-                var v =
+                var vL =
                     0.5 + 0.5 * Math.Sin(x * 2.3 + t * 1.3)
                     + 0.5 + 0.5 * Math.Sin(x * 7.1 - t * 0.9)
                     + 0.5 + 0.5 * Math.Sin(x * 3.7 + t * 2.1 + 1.7);
-                v = v / 3.0;
+                var vR =
+                    0.5 + 0.5 * Math.Sin(x * 2.3 + t * 1.3 + 0.7)
+                    + 0.5 + 0.5 * Math.Sin(x * 7.1 - t * 0.9 - 1.2)
+                    + 0.5 + 0.5 * Math.Sin(x * 3.7 + t * 2.1 + 2.3);
+                vL /= 3.0;
+                vR /= 3.0;
                 // 低频更饱满的高频衰减包络
                 var envelope = 0.35 + 0.65 * Math.Pow(1 - x, 1.6);
-                _target[b] = (float)(v * envelope * _playingLevel);
+                var level = _playingLevel;
+                _targetL[b] = (float)(vL * envelope * level);
+                _targetR[b] = (float)(vR * envelope * level);
             }
         }
-        ApplyAutoGain(count);
-        ApplyBassPump(count);
-        ApplyHighBoost(count);
-        return SmoothAndReturn(count);
+        ApplyBassPump(count, _targetL);
+        ApplyBassPump(count, _targetR);
+        ApplyHighBoost(count, _targetL);
+        ApplyHighBoost(count, _targetR);
+        SmoothAndReturn(count, _targetL, _smoothedL, _peakHoldL);
+        SmoothAndReturn(count, _targetR, _smoothedR, _peakHoldR);
+        UpdateBassEnergy(count);
+        return new SpectrumFrame(_smoothedL, _smoothedR, _bassEnergy);
+    }
+
+    /// <summary>统一模拟时钟（按真实流逝时间推进，与帧率解耦）。</summary>
+    private double SimTime()
+    {
+        var now = _simClock.Elapsed.TotalSeconds;
+        var dt = Math.Clamp(now - _lastSimT, 0, 0.1);
+        _lastSimT = now;
+        _simTime += dt;
+        return _simTime;
     }
 
     // ---------- 平滑与输出 ----------
 
-    private float[] SmoothAndReturn(int count)
+    private void SmoothAndReturn(int count, float[] target, float[] smoothed, float[] peakHold)
     {
         var attack = 1.0f / (1 + _smoothing);
         var decay = (float)Math.Pow(0.99, _smoothing);
@@ -279,22 +363,23 @@ public sealed class SpectrumEngine : IDisposable
         var hold = (float)Math.Pow(0.5, 1.0 / (0.3 * 30));
         for (var i = 0; i < count; i++)
         {
-            _peakHold[i] = Math.Max(_target[i], _peakHold[i] * hold);
-            // 非线性提升（^0.7）：小信号更明显，让频谱视觉上更饱满
-            var t = (float)Math.Pow(Math.Clamp(_peakHold[i], 0, 1), 0.7);
-            var prev = _smoothed[i];
-            _smoothed[i] = t > prev ? prev + (t - prev) * attack : prev * decay;
-            if (_smoothed[i] < 0.001f)
-                _smoothed[i] = 0;
+            peakHold[i] = Math.Max(target[i], peakHold[i] * hold);
+            var t = (float)Math.Pow(Math.Clamp(peakHold[i], 0, 1), 0.7);
+            var prev = smoothed[i];
+            smoothed[i] = t > prev ? prev + (t - prev) * attack : prev * decay;
+            if (smoothed[i] < 0.001f)
+                smoothed[i] = 0;
         }
-        return _smoothed;
     }
 
     private void DecayToZero(int count)
     {
         var decay = (float)Math.Pow(0.96, _smoothing * 2);
         for (var i = 0; i < count; i++)
-            _smoothed[i] *= decay;
+        {
+            _smoothedL[i] *= decay;
+            _smoothedR[i] *= decay;
+        }
     }
 
     public void Dispose()
@@ -310,5 +395,20 @@ public sealed class SpectrumEngine : IDisposable
             _capture.DataAvailable -= OnData;
             _capture.Dispose();
         }
+    }
+}
+
+/// <summary>一帧频谱数据：L/R 频带快照 + 低音能量。数组为引擎内部复用，须当帧用完。</summary>
+public readonly struct SpectrumFrame
+{
+    public float[] Left { get; }
+    public float[] Right { get; }
+    public float BassEnergy { get; }
+
+    public SpectrumFrame(float[] left, float[] right, float bassEnergy)
+    {
+        Left = left;
+        Right = right;
+        BassEnergy = bassEnergy;
     }
 }

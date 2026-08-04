@@ -29,7 +29,10 @@ public sealed class SpectrumFxControl : Control
     private bool _glowEnabled = true;
     private double _glowStrength = 1;
     private bool _centerBass = true;
-    private float[] _butterfly = Array.Empty<float>();
+    private double _breatheStrength = 0.25;
+    private float _breatheScale = 1f;
+    private float[] _lrBuf = Array.Empty<float>();
+    private float[] _monoBuf = Array.Empty<float>();
 
     private string _brushKey = "";
     private IBrush _fill = Brushes.Transparent;
@@ -56,6 +59,7 @@ public sealed class SpectrumFxControl : Control
         _glowEnabled = s.GlowEnabled;
         _glowStrength = Math.Clamp(s.GlowStrength, 0, 2);
         _centerBass = s.CenterBass;
+        _breatheStrength = Math.Clamp(s.Breathing, 0, 100) / 100.0;
         _engine?.SetSmoothing(_smoothing);
         _engine?.SetBandCount(_bandCount);
         RebuildBrushes(s.ColorHex);
@@ -86,53 +90,112 @@ public sealed class SpectrumFxControl : Control
         base.Render(context);
         if (!_enabled || Bounds.Width <= 0 || Bounds.Height <= 0)
             return;
-        var bands = _engine?.GetBands();
-        if (bands == null || bands.Length == 0)
+        var frame = _engine?.GetFrame();
+        if (frame == null || frame.Value.Left.Length == 0)
             return;
-        // 居中低音（蝴蝶布局）：低频居中、两侧对称升到高频；false 时保持传统左低右高
-        var drawBands = _centerBass && bands.Length >= 3 ? BuildButterfly(bands) : bands;
+        // 布局：L/R 镜像（中心低频、两侧高频且左右不同）或传统左低右高（立体声平均）
+        var drawBands = _centerBass ? BuildLR(frame.Value) : MergeToMono(frame.Value);
+        // 渲染级呼吸：低音驱动整体缩放（快起慢落）
+        UpdateBreathing(frame.Value.BassEnergy);
         using (context.PushClip(new RoundedRect(Bounds, CornerRadius)))
         {
             var area = DrawingArea();
             if (area.Width <= 0 || area.Height <= 0)
                 return;
             var mode = _position switch { "Top" => 1, "Bottom" => -1, _ => 0 };
-            if (_style == "Curve")
-                DrawCurve(context, drawBands, area, mode, filled: true);
-            else if (_style == "Line")
-                DrawCurve(context, drawBands, area, mode, filled: false);
-            else
-                DrawBars(context, drawBands, area, mode);
+            using (PushBreathingTransform(context))
+            {
+                if (_style == "Curve")
+                    DrawCurve(context, drawBands, area, mode, filled: true);
+                else if (_style == "Line")
+                    DrawCurve(context, drawBands, area, mode, filled: false);
+                else
+                    DrawBars(context, drawBands, area, mode);
+            }
         }
     }
 
-    /// <summary>把 band0..bandN 重排成蝴蝶形 [N..1, 0, 1..N]（低频居中，两侧对称升高）。</summary>
-    private float[] BuildButterfly(float[] bands)
+    /// <summary>L/R 镜像布局：左半 = L 反向（左端高频→中心低频），右半 = R 正向（中心低频→右端高频）。</summary>
+    private float[] BuildLR(SpectrumFrame frame)
     {
-        var n = bands.Length;
-        var m = 2 * n - 1;
-        if (_butterfly.Length != m)
-            _butterfly = new float[m];
-        for (var p = 0; p < m; p++)
+        var n = frame.Left.Length;
+        var m = 2 * n;
+        if (_lrBuf.Length != m)
+            _lrBuf = new float[m];
+        for (var p = 0; p < n; p++)
+            _lrBuf[p] = frame.Left[n - 1 - p];
+        for (var p = 0; p < n; p++)
+            _lrBuf[n + p] = frame.Right[p];
+        return _lrBuf;
+    }
+
+    /// <summary>传统布局：左右声道平均，单频谱左低右高。</summary>
+    private float[] MergeToMono(SpectrumFrame frame)
+    {
+        var n = frame.Left.Length;
+        if (_monoBuf.Length != n)
+            _monoBuf = new float[n];
+        for (var i = 0; i < n; i++)
+            _monoBuf[i] = (frame.Left[i] + frame.Right[i]) / 2;
+        return _monoBuf;
+    }
+
+    /// <summary>呼吸缩放：target = 1 + bass×强度，上升 0.2 / 下降 0.05（对齐 BetterLyrics breathing）。</summary>
+    private void UpdateBreathing(float bassEnergy)
+    {
+        var target = 1f + bassEnergy * (float)_breatheStrength;
+        _breatheScale += target > _breatheScale
+            ? (target - _breatheScale) * 0.2f
+            : (target - _breatheScale) * 0.05f;
+        if (_breatheScale < 1f)
+            _breatheScale = 1f;
+    }
+
+    private IDisposable PushBreathingTransform(DrawingContext context)
+    {
+        if (_breatheScale <= 1.0001f)
+            return NoOpDisposable.Instance;
+        var anchor = _position switch
         {
-            var d = Math.Abs(p - (n - 1));
-            _butterfly[p] = bands[Math.Min(n - 1, d)];
-        }
-        return _butterfly;
+            "Top" => new Point(Bounds.Width / 2, 0),
+            "Center" => new Point(Bounds.Width / 2, LyricsCenter()),
+            _ => new Point(Bounds.Width / 2, Bounds.Height),
+        };
+        var m = Matrix.CreateTranslation(-anchor) * Matrix.CreateScale(_breatheScale, _breatheScale) * Matrix.CreateTranslation(anchor);
+        return context.PushTransform(m);
+    }
+
+    private sealed class NoOpDisposable : IDisposable
+    {
+        public static readonly NoOpDisposable Instance = new();
+        public void Dispose() { }
     }
 
     private void RebuildBrushes(string colorHex)
     {
-        var key = $"{colorHex}|{_opacity}";
+        var key = $"{colorHex}|{_opacity}|{_position}";
         if (_brushKey == key)
             return;
         _brushKey = key;
         var c = Color.TryParse(colorHex, out var cc) ? cc : Color.FromRgb(0, 229, 255);
-        var solid = new ImmutableSolidColorBrush(Color.FromArgb((byte)Math.Round(c.A * _opacity), c.R, c.G, c.B));
-        _fill = solid;
+        var solid = Color.FromArgb((byte)Math.Round(c.A * _opacity), c.R, c.G, c.B);
+        // 渐变填充：Bottom 顶透明底实色 / Top 顶实色底透明 / Center 中心实色两端透明
+        var transparent = Color.FromArgb(0, c.R, c.G, c.B);
+        var stops = _position switch
+        {
+            "Top" => new GradientStops { new(solid, 0), new(transparent, 1) },
+            "Center" => new GradientStops { new(transparent, 0), new(solid, 0.5), new(transparent, 1) },
+            _ => new GradientStops { new(transparent, 0), new(solid, 1) },
+        };
+        _fill = new LinearGradientBrush
+        {
+            StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+            EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
+            GradientStops = stops,
+        };
         _glowBrush = new ImmutableSolidColorBrush(Color.FromArgb(
             (byte)Math.Round(c.A * _opacity * 0.32), c.R, c.G, c.B));
-        _strokePen = new Pen(solid, 2);
+        _strokePen = new Pen(new ImmutableSolidColorBrush(solid), 2);
     }
 
     /// <summary>歌词行垂直中心（行中央频谱锚定基准）。</summary>

@@ -3,8 +3,8 @@ using System.Runtime.InteropServices;
 namespace EasyDesktopLyrics.Services;
 
 /// <summary>
-/// WASAPI 环回采集：捕获系统正在播放（render 端点）的音频，输出单声道 float 样本。
-/// 纯 P/Invoke（无第三方依赖），实现对齐 cava input/winscap.c：
+/// WASAPI 环回采集：捕获系统正在播放（render 端点）的音频，输出交错立体声 float 样本
+/// （[L0,R0,L1,R1,...]，[-1,1]）。纯 P/Invoke（无第三方依赖），实现对齐 cava input/winscap.c：
 /// 事件驱动采集（LOOPBACK | EVENTCALLBACK + SetEventHandle），16ms 缓冲；
 /// 事件回调不可用时回退 10ms 轮询；静音帧输出零样本；多声道按 cava 0.7 增益规则下混。
 /// 初始化失败时以 IsRunning=false / Error 返回，由频谱引擎回退模拟。
@@ -35,7 +35,7 @@ public sealed class WasapiLoopbackCapture : IDisposable
     private volatile bool _running;
     private Exception? _error;
 
-    /// <summary>采集线程产出的单声道 float 样本块（[-1,1]）。</summary>
+    /// <summary>采集线程产出的交错立体声 float 样本块（[L0,R0,L1,R1,...]，[-1,1]）。</summary>
     public event Action<float[]>? DataAvailable;
 
     /// <summary>true = 环回采集已就绪。</summary>
@@ -242,20 +242,21 @@ public sealed class WasapiLoopbackCapture : IDisposable
                 // 静音帧输出零样本，让频谱在静音时正常回落（对齐 cava write_silent_frame）
                 DataAvailable?.Invoke((flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0
                     ? ConvertSilence((int)numFrames)
-                    : ConvertToMono(data, (int)numFrames));
+                    : ConvertToStereo(data, (int)numFrames));
             }
             _captureClient.ReleaseBuffer(numFrames);
         }
     }
 
-    private float[] ConvertToMono(IntPtr data, int frames)
+    /// <summary>把任意声道数下混为交错立体声（[L0,R0,L1,R1,...]），中置/环绕按 cava 0.7 增益规则。</summary>
+    private float[] ConvertToStereo(IntPtr data, int frames)
     {
         var total = frames * _channels * _bytesPerSample;
         if (_work.Length < total)
             Array.Resize(ref _work, total);
         Marshal.Copy(data, _work, 0, total);
 
-        var mono = new float[frames];
+        var stereo = new float[frames * 2];
         var step = _channels * _bytesPerSample;
         var chans = Math.Min(_channels, _chan.Length);
         for (var i = 0; i < frames; i++)
@@ -274,14 +275,15 @@ public sealed class WasapiLoopbackCapture : IDisposable
             if (chans >= 3) { left += _chan[2] * 0.7; right += _chan[2] * 0.7; }
             if (chans >= 5) { left += _chan[4] * 0.7; right += _chan[5] * 0.7; }
             if (chans >= 7) { left += _chan[6] * 0.7; right += _chan[7] * 0.7; }
-            mono[i] = (float)((left + right) / 2);
+            stereo[i * 2] = (float)left;
+            stereo[i * 2 + 1] = (float)right;
         }
-        return mono;
+        return stereo;
     }
 
     private static float[] ConvertSilence(int frames)
     {
-        return new float[frames];
+        return new float[frames * 2];
     }
 
     private void Cleanup()

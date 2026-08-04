@@ -149,6 +149,17 @@ public sealed partial class SettingsViewModel
         }
     }
 
+    public double SpectrumBreathingVal
+    {
+        get => _settings.Current.BackgroundFx.Spectrum.Breathing;
+        set
+        {
+            var v = (int)Math.Round(value);
+            if (v == _settings.Current.BackgroundFx.Spectrum.Breathing) return;
+            _settings.Update(s => s.BackgroundFx.Spectrum.Breathing = Math.Clamp(v, 0, 100));
+        }
+    }
+
     public double SpectrumGlowStrengthVal
     {
         get => _settings.Current.BackgroundFx.Spectrum.GlowStrength;

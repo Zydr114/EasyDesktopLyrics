@@ -117,6 +117,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         nameof(SpectrumOpacityVal), nameof(SpectrumColorValue),
         nameof(SpectrumGlowEnabled), nameof(SpectrumGlowStrengthVal),
         nameof(SpectrumSmoothingVal), nameof(SpectrumCenterBassEnabled),
+        nameof(SpectrumBreathingVal),
         nameof(SnowEnabled), nameof(SnowIntensityVal), nameof(SnowWidthVal), nameof(SnowOpacityVal),
         nameof(SnowSizeVal), nameof(SnowSpeedVal), nameof(SnowColorValue),
         nameof(FogEnabled), nameof(FogOpacityVal), nameof(FogSoftnessVal), nameof(FogFlowVal),
