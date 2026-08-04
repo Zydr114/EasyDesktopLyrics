@@ -218,6 +218,9 @@ public sealed class SpectrumFxSettings
     /// <summary>宽度范围 = 窗口宽度百分比（20–100）。</summary>
     public double WidthPct { get; set; } = 100;
 
+    /// <summary>居中低音（蝴蝶布局）：低频居中、向两侧对称升到高频；false = 传统左低右高。</summary>
+    public bool CenterBass { get; set; } = true;
+
     public double Opacity { get; set; } = 0.8;
 
     public string ColorHex { get; set; } = "#00E5FF";

@@ -28,6 +28,8 @@ public sealed class SpectrumFxControl : Control
     private double _opacity = 0.8;
     private bool _glowEnabled = true;
     private double _glowStrength = 1;
+    private bool _centerBass = true;
+    private float[] _butterfly = Array.Empty<float>();
 
     private string _brushKey = "";
     private IBrush _fill = Brushes.Transparent;
@@ -53,6 +55,7 @@ public sealed class SpectrumFxControl : Control
         _opacity = Math.Clamp(s.Opacity, 0.05, 1);
         _glowEnabled = s.GlowEnabled;
         _glowStrength = Math.Clamp(s.GlowStrength, 0, 2);
+        _centerBass = s.CenterBass;
         _engine?.SetSmoothing(_smoothing);
         _engine?.SetBandCount(_bandCount);
         RebuildBrushes(s.ColorHex);
@@ -86,6 +89,8 @@ public sealed class SpectrumFxControl : Control
         var bands = _engine?.GetBands();
         if (bands == null || bands.Length == 0)
             return;
+        // 居中低音（蝴蝶布局）：低频居中、两侧对称升到高频；false 时保持传统左低右高
+        var drawBands = _centerBass && bands.Length >= 3 ? BuildButterfly(bands) : bands;
         using (context.PushClip(new RoundedRect(Bounds, CornerRadius)))
         {
             var area = DrawingArea();
@@ -93,12 +98,27 @@ public sealed class SpectrumFxControl : Control
                 return;
             var mode = _position switch { "Top" => 1, "Bottom" => -1, _ => 0 };
             if (_style == "Curve")
-                DrawCurve(context, bands, area, mode, filled: true);
+                DrawCurve(context, drawBands, area, mode, filled: true);
             else if (_style == "Line")
-                DrawCurve(context, bands, area, mode, filled: false);
+                DrawCurve(context, drawBands, area, mode, filled: false);
             else
-                DrawBars(context, bands, area, mode);
+                DrawBars(context, drawBands, area, mode);
         }
+    }
+
+    /// <summary>把 band0..bandN 重排成蝴蝶形 [N..1, 0, 1..N]（低频居中，两侧对称升高）。</summary>
+    private float[] BuildButterfly(float[] bands)
+    {
+        var n = bands.Length;
+        var m = 2 * n - 1;
+        if (_butterfly.Length != m)
+            _butterfly = new float[m];
+        for (var p = 0; p < m; p++)
+        {
+            var d = Math.Abs(p - (n - 1));
+            _butterfly[p] = bands[Math.Min(n - 1, d)];
+        }
+        return _butterfly;
     }
 
     private void RebuildBrushes(string colorHex)

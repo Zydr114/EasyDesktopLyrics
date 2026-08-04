@@ -149,6 +149,7 @@ public sealed class SpectrumEngine : IDisposable
         FillTargetFromMagnitudes(count);
         ApplyAutoGain(count);
         ApplyBassPump(count);
+        ApplyHighBoost(count);
         return SmoothAndReturn(count);
     }
 
@@ -174,11 +175,11 @@ public sealed class SpectrumEngine : IDisposable
         }
     }
 
-    /// <summary>频段补偿增益曲线（线性插值）：低频补强，高频温和滚降（不再压到 0.45）。</summary>
+    /// <summary>频段补偿增益曲线（线性插值）：低频补强，高频不再滚降（配合 ApplyHighBoost 让高频也有内容）。</summary>
     private static double CompensationGain(double fLo, double fHi)
     {
         ReadOnlySpan<double> freqs = [20, 50, 100, 200, 500, 1000, 2000, 4000, 8000, 12000, 16000, 20000];
-        ReadOnlySpan<double> gains = [1.5, 1.4, 1.25, 1.1, 1.0, 1.0, 0.95, 0.85, 0.8, 0.8, 0.8, 0.8];
+        ReadOnlySpan<double> gains = [1.5, 1.4, 1.25, 1.1, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0];
         var f = (fLo + fHi) / 2;
         if (f <= freqs[0])
             return gains[0];
@@ -221,6 +222,21 @@ public sealed class SpectrumEngine : IDisposable
             _target[b] = (float)Math.Min(1.0, _target[b] * pump);
     }
 
+    /// <summary>
+    /// 高频活性增强：对后 1/3 频段做非线性指数提升（越高频指数越小），
+    /// 音乐高频能量弱时也能明显起伏；配合峰值保持让高频区真正动起来。
+    /// </summary>
+    private void ApplyHighBoost(int count)
+    {
+        var hiStart = count * 2 / 3;
+        for (var b = hiStart; b < count; b++)
+        {
+            var t = (double)(b - hiStart) / Math.Max(1, count - 1 - hiStart);
+            var exponent = 0.7 - 0.3 * t;
+            _target[b] = (float)Math.Min(1.0, Math.Pow(Math.Max(0.0001, _target[b]), exponent));
+        }
+    }
+
     // ---------- 模拟频谱 ----------
 
     private float[] ComputeSimulatedBands()
@@ -249,6 +265,7 @@ public sealed class SpectrumEngine : IDisposable
         }
         ApplyAutoGain(count);
         ApplyBassPump(count);
+        ApplyHighBoost(count);
         return SmoothAndReturn(count);
     }
 

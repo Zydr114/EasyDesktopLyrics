@@ -74,6 +74,11 @@
                        Text="{Binding SpectrumWidthVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}%'}"
                        TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
             </Grid>
+            <Grid ColumnDefinitions="140,*" ColumnSpacing="14">
+              <TextBlock Classes="sectionLabel" Text="布局" />
+              <CheckBox Grid.Column="1" Content="居中低音（低频居中、两侧高频）"
+                        IsChecked="{Binding SpectrumCenterBassEnabled, Mode=TwoWay}" VerticalAlignment="Center" />
+            </Grid>
             <TextBlock Text="位置语义：顶部/底部 = 单侧频谱（自边缘向内生长）；行中央 = 双侧频谱（沿 x 轴对称）。强度 = 频谱最高峰占窗口高度百分比。" FontSize="11" Opacity="0.6" TextWrapping="Wrap" />
             <Grid ColumnDefinitions="140,*" ColumnSpacing="14">
               <TextBlock Classes="sectionLabel" Text="颜色" />

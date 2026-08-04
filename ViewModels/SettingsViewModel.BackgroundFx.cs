@@ -139,6 +139,16 @@ public sealed partial class SettingsViewModel
         }
     }
 
+    public bool SpectrumCenterBassEnabled
+    {
+        get => _settings.Current.BackgroundFx.Spectrum.CenterBass;
+        set
+        {
+            if (value == SpectrumCenterBassEnabled) return;
+            _settings.Update(s => s.BackgroundFx.Spectrum.CenterBass = value);
+        }
+    }
+
     public double SpectrumGlowStrengthVal
     {
         get => _settings.Current.BackgroundFx.Spectrum.GlowStrength;
