@@ -54,6 +54,14 @@ internal static class Win32
         return (r.Right - r.Left, r.Bottom - r.Top, 0);
     }
 
+    /// <summary>物理窗口屏幕矩形（GetWindowRect，像素）；失败返回 null。</summary>
+    public static (int X, int Y, int W, int H)? GetWindowScreenRect(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return null;
+        if (!GetWindowRect(hwnd, out var r)) return null;
+        return (r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top);
+    }
+
     /// <summary>物理客户区矩形（GetClientRect，像素）；失败返回 (0,0,err)。</summary>
     public static (int W, int H, int Err) GetClientSize(IntPtr hwnd)
     {
