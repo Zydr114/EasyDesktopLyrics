@@ -62,7 +62,7 @@
             <Slider Grid.Column="1" Minimum="0.05" Maximum="1" TickFrequency="0.05"
                     Value="{Binding InactiveOpacityVal, Mode=TwoWay}" />
             <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
-                     Text="{Binding InactiveOpacityVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:P0}'}"
+                     Text="{Binding InactiveOpacityVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F2}'}"
                      TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
           </Grid>
           <TextBlock Text="未唱不透明度为相对比例：100% 时未唱段与已唱段等亮。独立颜色不勾选时，该比例同时控制未唱段亮度。" FontSize="11" Opacity="0.6" />
@@ -94,7 +94,7 @@
             <Slider Minimum="0.2" Maximum="1" TickFrequency="0.05"
                     Value="{Binding TextOpacity, Mode=TwoWay}" />
             <TextBox Grid.Column="1" MinHeight="28" Padding="8,2"
-                     Text="{Binding TextOpacity, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:P0}'}"
+                     Text="{Binding TextOpacity, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F2}'}"
                      TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
           </Grid>
         </Grid>
@@ -145,7 +145,7 @@
               <Slider Grid.Column="1" Minimum="5" Maximum="95" TickFrequency="1"
                       Value="{Binding PositionXPct, Mode=TwoWay}" />
               <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
-                       Text="{Binding PositionXPct, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}%'}"
+                       Text="{Binding PositionXPct, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
                        TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
             </Grid>
             <Grid ColumnDefinitions="50,*,64" ColumnSpacing="14">
@@ -153,7 +153,7 @@
               <Slider Grid.Column="1" Minimum="5" Maximum="95" TickFrequency="1"
                       Value="{Binding PositionYPct, Mode=TwoWay}" />
               <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
-                       Text="{Binding PositionYPct, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}%'}"
+                       Text="{Binding PositionYPct, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
                        TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
             </Grid>
             <Grid ColumnDefinitions="50,*,Auto" ColumnSpacing="14">

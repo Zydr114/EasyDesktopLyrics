@@ -22,17 +22,17 @@
           <TextBlock Classes="sectionLabel" Text="封面占比" Grid.Row="2" />
           <Slider Grid.Column="1" Grid.Row="2" Minimum="40" Maximum="120" TickFrequency="5"
                   Value="{Binding CoverSizePctVal, Mode=TwoWay}" />
-          <TextBox Grid.Column="2" Grid.Row="2" MinHeight="28" Padding="8,2" Text="{Binding CoverSizePctVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}%'}"
+          <TextBox Grid.Column="2" Grid.Row="2" MinHeight="28" Padding="8,2" Text="{Binding CoverSizePctVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
                    TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
           <TextBlock Classes="sectionLabel" Text="最短显示" Grid.Row="3" />
           <Slider Grid.Column="1" Grid.Row="3" Minimum="0.3" Maximum="5" TickFrequency="0.1"
                   Value="{Binding CoverAnimMinSec, Mode=TwoWay}" />
-          <TextBox Grid.Column="2" Grid.Row="3" MinHeight="28" Padding="8,2" Text="{Binding CoverAnimMinSec, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}s'}"
+          <TextBox Grid.Column="2" Grid.Row="3" MinHeight="28" Padding="8,2" Text="{Binding CoverAnimMinSec, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}'}"
                    TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
           <TextBlock Classes="sectionLabel" Text="最长显示" Grid.Row="4" />
           <Slider Grid.Column="1" Grid.Row="4" Minimum="1" Maximum="15" TickFrequency="0.5"
                   Value="{Binding CoverAnimMaxSec, Mode=TwoWay}" />
-          <TextBox Grid.Column="2" Grid.Row="4" MinHeight="28" Padding="8,2" Text="{Binding CoverAnimMaxSec, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}s'}"
+          <TextBox Grid.Column="2" Grid.Row="4" MinHeight="28" Padding="8,2" Text="{Binding CoverAnimMaxSec, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}'}"
                    TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
           <TextBlock Classes="sectionLabel" Text="缓动曲线" Grid.Row="5" />
           <ComboBox Grid.Column="1" Grid.Row="5" ItemsSource="{Binding CoverAnimEasingOptions}"
@@ -41,7 +41,7 @@
           <TextBlock Classes="sectionLabel" Text="动画时长" Grid.Row="6" />
           <Slider Grid.Column="1" Grid.Row="6" Minimum="0.1" Maximum="2" TickFrequency="0.05"
                   Value="{Binding CoverAnimDurationVal, Mode=TwoWay}" />
-          <TextBox Grid.Column="2" Grid.Row="6" MinHeight="28" Padding="8,2" Text="{Binding CoverAnimDurationVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}s'}"
+          <TextBox Grid.Column="2" Grid.Row="6" MinHeight="28" Padding="8,2" Text="{Binding CoverAnimDurationVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F1}'}"
                    TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
           <TextBlock Classes="sectionLabel" Text="淡入淡出方向" Grid.Row="7" />
           <ComboBox Grid.Column="1" Grid.Row="7" ItemsSource="{Binding CoverAnimDirectionOptions}"
@@ -50,7 +50,7 @@
           <TextBlock Classes="sectionLabel" Text="位移强度" Grid.Row="8" />
           <Slider Grid.Column="1" Grid.Row="8" Minimum="0" Maximum="60" TickFrequency="1"
                   Value="{Binding CoverAnimSlideDistanceVal, Mode=TwoWay}" />
-          <TextBox Grid.Column="2" Grid.Row="8" MinHeight="28" Padding="8,2" Text="{Binding CoverAnimSlideDistanceVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}px'}"
+          <TextBox Grid.Column="2" Grid.Row="8" MinHeight="28" Padding="8,2" Text="{Binding CoverAnimSlideDistanceVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
                    TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
         </Grid>
 
@@ -73,7 +73,7 @@
                 <Slider Grid.Column="1" Minimum="0" Maximum="40" TickFrequency="1"
                         Value="{Binding CoverTitleSlideDistanceVal, Mode=TwoWay}" />
                 <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
-                         Text="{Binding CoverTitleSlideDistanceVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}px'}"
+                         Text="{Binding CoverTitleSlideDistanceVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F0}'}"
                          TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
               </Grid>
               <TextBlock Text="歌名与歌手分行显示，位于封面下方，随切歌动画淡入淡出；样式独立可调。" FontSize="11" Opacity="0.6" />
@@ -108,7 +108,7 @@
                 <Slider Grid.Column="1" Minimum="0.05" Maximum="1" TickFrequency="0.05"
                         Value="{Binding CoverTitleOpacityVal, Mode=TwoWay}" />
                 <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
-                         Text="{Binding CoverTitleOpacityVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:P0}'}"
+                         Text="{Binding CoverTitleOpacityVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F2}'}"
                          TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
               </Grid>
               <StackPanel Spacing="6">
@@ -188,7 +188,7 @@
                 <Slider Grid.Column="1" Minimum="0.05" Maximum="1" TickFrequency="0.05"
                         Value="{Binding CoverArtistOpacityVal, Mode=TwoWay}" />
                 <TextBox Grid.Column="2" MinHeight="28" Padding="8,2"
-                         Text="{Binding CoverArtistOpacityVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:P0}'}"
+                         Text="{Binding CoverArtistOpacityVal, Mode=TwoWay, UpdateSourceTrigger=LostFocus, StringFormat='{}{0:F2}'}"
                          TextAlignment="Right" VerticalAlignment="Center" FontSize="12" />
               </Grid>
               <StackPanel Spacing="6">
