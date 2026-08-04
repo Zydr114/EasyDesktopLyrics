@@ -29,6 +29,8 @@ public sealed class SpectrumEngine : IDisposable
     // 模拟频谱状态
     private double _simTime;
     private double _playingLevel;
+    private readonly System.Diagnostics.Stopwatch _simClock = System.Diagnostics.Stopwatch.StartNew();
+    private double _lastSimT;
 
     public SpectrumEngine()
     {
@@ -197,7 +199,11 @@ public sealed class SpectrumEngine : IDisposable
         var count = _smoothed.Length;
         lock (_lock)
         {
-            _simTime += 0.033;
+            // 按真实流逝时间推进（与渲染帧率解耦，动画速度恒定）
+            var now = _simClock.Elapsed.TotalSeconds;
+            var dt = Math.Clamp(now - _lastSimT, 0, 0.1);
+            _lastSimT = now;
+            _simTime += dt;
             for (var b = 0; b < count; b++)
             {
                 var x = b / (double)count;

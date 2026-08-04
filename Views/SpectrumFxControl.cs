@@ -198,38 +198,33 @@ public sealed class SpectrumFxControl : Control
         var n = bands.Length;
         if (n < 2)
             return;
-        var baseline = mode switch { 1 => area.Top, -1 => area.Bottom, _ => area.Y + area.Height / 2 };
-        var maxPerSide = mode == 0 ? area.Height / 2 : area.Height;
+
+        // 单曲线（Line）不做 x 轴对称：行中央时按底部基线正常显示单根曲线
+        var effMode = !filled && mode == 0 ? -1 : mode;
+        var baseline = effMode switch { 1 => area.Top, -1 => area.Bottom, _ => area.Y + area.Height / 2 };
+        var maxPerSide = effMode == 0 ? area.Height / 2 : area.Height;
         var step = area.Width / (n - 1);
 
         var points = new Point[n];
         for (var i = 0; i < n; i++)
         {
             var dy = bands[i] * maxPerSide;
-            points[i] = new Point(area.X + i * step, mode == 1 ? baseline + dy : baseline - dy);
+            points[i] = new Point(area.X + i * step, effMode == 1 ? baseline + dy : baseline - dy);
         }
 
-        Geometry? mirror = null;
-        if (mode == 0 && !filled)
-            mirror = BuildPolyline(MirrorPoints(points, baseline));
-
-        var geo = BuildCurveGeometry(points, baseline, mode, filled, area);
+        var geo = BuildCurveGeometry(points, baseline, effMode, filled, area);
 
         if (_glowEnabled)
         {
             var pen = new Pen(_glowBrush, Math.Max(1, 4 * _glowStrength + 1));
             context.DrawGeometry(null, pen, geo);
-            if (mirror != null)
-                context.DrawGeometry(null, pen, mirror);
         }
         context.DrawGeometry(filled ? _fill : Brushes.Transparent, _strokePen, geo);
-        if (mirror != null)
-            context.DrawGeometry(null, _strokePen, mirror);
     }
 
     /// <summary>
-    /// 曲线几何：填充模式在 顶部/底部 时闭合到基线（单侧），行中央时沿 x 轴对称闭合（双侧）；
-    /// 非填充（单曲线）为开放折线，行中央时另画一条镜像折线。
+    /// 曲线几何（Catmull-Rom → 三次贝塞尔平滑）：填充模式在 顶部/底部 时闭合到基线（单侧），
+    /// 行中央时沿 x 轴对称闭合（双侧）；非填充（单曲线）为平滑开放曲线。
     /// </summary>
     private static Geometry BuildCurveGeometry(Point[] points, double baseline, int mode, bool filled, Rect area)
     {
@@ -237,14 +232,17 @@ public sealed class SpectrumFxControl : Control
         using (var gc = geo.Open())
         {
             gc.BeginFigure(points[0], filled);
-            for (var i = 1; i < points.Length; i++)
-                gc.LineTo(points[i]);
+            AddSmoothThrough(gc, points);
             if (filled)
             {
                 if (mode == 0)
                 {
-                    for (var i = points.Length - 1; i >= 0; i--)
-                        gc.LineTo(new Point(points[i].X, 2 * baseline - points[i].Y));
+                    var mirror = MirrorPoints(points, baseline);
+                    gc.LineTo(mirror[^1]);
+                    var reversed = new Point[mirror.Length];
+                    for (var i = 0; i < mirror.Length; i++)
+                        reversed[i] = mirror[mirror.Length - 1 - i];
+                    AddSmoothThrough(gc, reversed);
                 }
                 else
                 {
@@ -257,17 +255,17 @@ public sealed class SpectrumFxControl : Control
         return geo;
     }
 
-    private static Geometry BuildPolyline(Point[] points)
+    /// <summary>从当前点（= pts[0]）出发，用 Catmull-Rom → 三次贝塞尔平滑连接全部点。</summary>
+    private static void AddSmoothThrough(StreamGeometryContext gc, Point[] pts)
     {
-        var geo = new StreamGeometry();
-        using (var gc = geo.Open())
+        for (var i = 0; i < pts.Length - 1; i++)
         {
-            gc.BeginFigure(points[0], false);
-            for (var i = 1; i < points.Length; i++)
-                gc.LineTo(points[i]);
-            gc.EndFigure(false);
+            var p1 = pts[i];
+            var p2 = pts[i + 1];
+            var p0 = i > 0 ? pts[i - 1] : p1;
+            var p3 = i + 2 < pts.Length ? pts[i + 2] : p2;
+            gc.CubicBezierTo(p1 + (p2 - p0) / 6, p2 - (p3 - p1) / 6, p2);
         }
-        return geo;
     }
 
     private static Point[] MirrorPoints(Point[] points, double baseline)
