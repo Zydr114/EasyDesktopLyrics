@@ -158,6 +158,9 @@ public sealed class AppSettings
     /// <summary>全局时间偏移（ms），正值 = 歌词提前。</summary>
     public int GlobalOffsetMs { get; set; }
 
+    // ---- 背景动效 ----
+    public BackgroundFxSettings BackgroundFx { get; set; } = new();
+
     // ---- 兼容旧版（v0.1）----
     public bool NeteaseEnabled { get; set; } = true;
     public bool QQMusicEnabled { get; set; } = true;
@@ -180,4 +183,95 @@ public sealed class PlayerPriority
 
     /// <summary>false = 忽略该播放器的 SMTC 会话。</summary>
     public bool Enabled { get; set; } = true;
+}
+
+/// <summary>背景动效设置（频谱/飘雪/雾层），均默认关闭，与主功能解耦。</summary>
+public sealed class BackgroundFxSettings
+{
+    /// <summary>渲染帧率（30–120）。</summary>
+    public int Fps { get; set; } = 30;
+
+    public SpectrumFxSettings Spectrum { get; set; } = new();
+
+    public SnowFxSettings Snow { get; set; } = new();
+
+    public FogFxSettings Fog { get; set; } = new();
+}
+
+/// <summary>频谱动效设置。</summary>
+public sealed class SpectrumFxSettings
+{
+    public bool Enabled { get; set; }
+
+    /// <summary>位置："Bottom" 底部 / "Center" 行中央 / "Top" 顶部。</summary>
+    public string Position { get; set; } = "Bottom";
+
+    /// <summary>样式："Bars" 柱状图 / "Curve" 曲线 / "Line" 单曲线。</summary>
+    public string Style { get; set; } = "Bars";
+
+    /// <summary>频谱高度（px）。</summary>
+    public double Height { get; set; } = 60;
+
+    public double Opacity { get; set; } = 0.8;
+
+    public string ColorHex { get; set; } = "#00E5FF";
+
+    public bool GlowEnabled { get; set; } = true;
+
+    /// <summary>辉光强度倍率（0–2）。</summary>
+    public double GlowStrength { get; set; } = 1.0;
+
+    /// <summary>FFT 平滑帧数（1–10，越大越柔和）。</summary>
+    public int Smoothing { get; set; } = 3;
+
+    /// <summary>中轴对称镜像（柱状/曲线从中线上下展开）。</summary>
+    public bool Mirror { get; set; }
+}
+
+/// <summary>飘雪动效设置。</summary>
+public sealed class SnowFxSettings
+{
+    public bool Enabled { get; set; }
+
+    /// <summary>粒子数量上限（20–400）。</summary>
+    public int Intensity { get; set; } = 80;
+
+    /// <summary>飘雪范围 = 窗口宽度百分比（20–100）。</summary>
+    public double WidthPct { get; set; } = 100;
+
+    public double Opacity { get; set; } = 0.7;
+
+    /// <summary>雪花大小倍率（0.4–3）。</summary>
+    public double Size { get; set; } = 1.0;
+
+    /// <summary>下落速度倍率（0.2–3）。</summary>
+    public double Speed { get; set; } = 1.0;
+
+    public string ColorHex { get; set; } = "#FFFFFF";
+}
+
+/// <summary>雾层动效设置。</summary>
+public sealed class FogFxSettings
+{
+    public bool Enabled { get; set; }
+
+    public double Opacity { get; set; } = 0.35;
+
+    /// <summary>伪模糊强度（光晕柔和度，0.5–3）。</summary>
+    public double Softness { get; set; } = 1.0;
+
+    /// <summary>颜色流动速度（0–3，0 = 静止）。</summary>
+    public double FlowSpeed { get; set; } = 1.0;
+
+    /// <summary>是否使用封面主色。</summary>
+    public bool UseCoverColor { get; set; } = true;
+
+    /// <summary>是否使用窗口背后采样色。</summary>
+    public bool UseBackdropColor { get; set; } = true;
+
+    /// <summary>封面色 / 背后色混合比例（0–1，1 = 全封面）。</summary>
+    public double Blend { get; set; } = 0.5;
+
+    /// <summary>颜色流动开关（false = 静态）。</summary>
+    public bool Animated { get; set; } = true;
 }
